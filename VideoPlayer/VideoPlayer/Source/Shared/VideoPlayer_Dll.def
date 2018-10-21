@@ -1,0 +1,15 @@
+EXPORTS
+    DllCanUnloadNow = WINRT_CanUnloadNow                    PRIVATE
+    DllGetActivationFactory = WINRT_GetActivationFactory    PRIVATE
+    UnityPluginLoad
+    UnityPluginUnload
+    GetRenderEventFunc
+
+    ReleaseInstance
+
+    MediaPlayerCreatePlayer
+    MediaPlayerCreateTexture
+    MediaPlayerLoadContent
+    MediaPlayerPlay
+    MediaPlayerPause
+    MediaPlayerStop

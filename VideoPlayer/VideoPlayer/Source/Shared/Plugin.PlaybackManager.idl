@@ -1,0 +1,16 @@
+#pragma once
+
+import "Plugin.Module.idl";
+
+namespace VideoPlayer.Plugin
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass PlaybackManager : Module
+    {
+        PlaybackManager();
+
+        event Windows.Foundation.EventHandler<PlaybackManager> Closed;
+    };
+}

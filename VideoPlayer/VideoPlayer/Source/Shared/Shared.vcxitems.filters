@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)pch.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)UnityDeviceResource.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)VideoPlayer_Dll.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.Module.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)MediaHelpers.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)PlatformBase.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)UnityDeviceResource.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphics.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D9.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D11.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D12.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsMetal.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityInterface.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.Module.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)MediaHelpers.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl">
+      <Filter>Plugin</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.idl">
+      <Filter>Plugin</Filter>
+    </Midl>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)VideoPlayer_Dll.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Unity">
+      <UniqueIdentifier>{870fbfd8-dffc-4bda-afe7-421f96cf55e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin">
+      <UniqueIdentifier>{e0764302-b235-4208-96e2-31ff7400f99b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

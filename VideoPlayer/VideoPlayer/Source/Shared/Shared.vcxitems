@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{870fbfd8-dffc-4bda-afe7-421f96cf55e4}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)MediaHelpers.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphics.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D11.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D12.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D9.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsMetal.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityInterface.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)PlatformBase.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)UnityDeviceResource.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.Module.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)MediaHelpers.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)UnityDeviceResource.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)VideoPlayer_Dll.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.Module.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)VideoPlayer_Dll.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl" />
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.PlaybackManager.idl" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,65 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2046
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitySample", "VideoPlayer\UnitySample\UnitySample.vcxproj", "{D213187D-5703-448C-AB99-F03287D1AE4B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{BD3DC667-3FD2-4BCD-8A62-E1BBDB4954DD}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Shared", "VideoPlayer\Source\Shared\Shared.vcxitems", "{870FBFD8-DFFC-4BDA-AFE7-421F96CF55E4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UWP", "VideoPlayer\Source\UWP\UWP.vcxproj", "{11D3DFD5-5279-4E6C-940F-AD84E9624E40}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Win32", "VideoPlayer\Source\Win32\Win32.vcxproj", "{3EEC6D48-8897-4130-81AD-E886D7A50328}"
+EndProject
+Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		VideoPlayer\Source\Shared\Shared.vcxitems*{11d3dfd5-5279-4e6c-940f-ad84e9624e40}*SharedItemsImports = 4
+		VideoPlayer\Source\Shared\Shared.vcxitems*{3eec6d48-8897-4130-81ad-e886d7a50328}*SharedItemsImports = 4
+		VideoPlayer\Source\Shared\Shared.vcxitems*{870fbfd8-dffc-4bda-afe7-421f96cf55e4}*SharedItemsImports = 9
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Debug|x64.ActiveCfg = Debug|x64
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Debug|x64.Build.0 = Debug|x64
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Debug|x86.ActiveCfg = Debug|Win32
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Debug|x86.Build.0 = Debug|Win32
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Release|x64.ActiveCfg = Release|x64
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Release|x64.Build.0 = Release|x64
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Release|x86.ActiveCfg = Release|Win32
+		{D213187D-5703-448C-AB99-F03287D1AE4B}.Release|x86.Build.0 = Release|Win32
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Debug|x64.ActiveCfg = Debug|x64
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Debug|x64.Build.0 = Debug|x64
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Debug|x86.ActiveCfg = Debug|Win32
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Debug|x86.Build.0 = Debug|Win32
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Release|x64.ActiveCfg = Release|x64
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Release|x64.Build.0 = Release|x64
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Release|x86.ActiveCfg = Release|Win32
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40}.Release|x86.Build.0 = Release|Win32
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Debug|x64.ActiveCfg = Debug|x64
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Debug|x64.Build.0 = Debug|x64
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Debug|x86.ActiveCfg = Debug|Win32
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Debug|x86.Build.0 = Debug|Win32
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Release|x64.ActiveCfg = Release|x64
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Release|x64.Build.0 = Release|x64
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Release|x86.ActiveCfg = Release|Win32
+		{3EEC6D48-8897-4130-81AD-E886D7A50328}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{870FBFD8-DFFC-4BDA-AFE7-421F96CF55E4} = {BD3DC667-3FD2-4BCD-8A62-E1BBDB4954DD}
+		{11D3DFD5-5279-4E6C-940F-AD84E9624E40} = {BD3DC667-3FD2-4BCD-8A62-E1BBDB4954DD}
+		{3EEC6D48-8897-4130-81AD-E886D7A50328} = {BD3DC667-3FD2-4BCD-8A62-E1BBDB4954DD}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {ADE2E8D3-5D4A-4ACD-9E99-1EC9C32ABB2E}
+	EndGlobalSection
+EndGlobal
