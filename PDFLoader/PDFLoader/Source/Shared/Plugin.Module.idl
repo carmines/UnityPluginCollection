@@ -1,0 +1,30 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+namespace PDFLoader.Plugin
+{
+    runtimeclass Module;
+
+    [version(1.0), exclusiveto(Module), uuid(3cc03f99-2721-4c86-b9e6-f8e0ac86772c)]
+    interface IModule : IInspectable
+    {
+        void Shutdown();
+        void OnRenderEvent(UInt16 frameNumber);
+    };
+
+    [version(1.0), exclusiveto(Module), uuid(269ce156-a271-48c9-a797-bf9dbae76089)]
+    interface IModuleFactory : IInspectable
+    {
+    }
+
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    [composable(IModuleFactory, protected, 1.0)]
+    runtimeclass Module
+    {
+        [default] interface IModule;
+    };
+}

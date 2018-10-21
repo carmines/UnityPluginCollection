@@ -1,0 +1,24 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+import "Plugin.Module.idl";
+
+namespace PDFLoader.Plugin
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass PdfLoader : Module
+    {
+        PdfLoader();
+
+        Windows.Data.Pdf.PdfDocument Document{ get; };
+        Windows.Data.Pdf.PdfPage Page{ get; };
+        UInt32 PageCount{ get; };
+
+        HRESULT LoadFile(String folderName, String fileName);
+        HRESULT SelectPage(UInt32 pageIndex);
+    };
+}

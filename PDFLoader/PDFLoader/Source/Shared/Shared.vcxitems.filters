@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)pch.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)UnityDeviceResource.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)PDFLoader_Dll.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.Module.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.cpp">
+      <Filter>Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)WICTextureLoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)PlatformBase.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)UnityDeviceResource.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphics.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D9.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D11.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D12.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsMetal.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityInterface.h">
+      <Filter>Unity</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.Module.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.h">
+      <Filter>Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)WICTextureLoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl">
+      <Filter>Plugin</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.idl">
+      <Filter>Plugin</Filter>
+    </Midl>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)PDFLoader_Dll.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Unity">
+      <UniqueIdentifier>{bdbccf62-3980-4ced-8335-cf97a4f8bf24}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Plugin">
+      <UniqueIdentifier>{5eb45fb2-4534-44c8-9273-9476342ff4a4}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

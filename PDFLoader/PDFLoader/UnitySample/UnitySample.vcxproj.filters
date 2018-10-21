@@ -1,0 +1,119 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="readme.txt" />
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Plugins.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x64\PDFLoader.dll.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x64</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x86\PDFLoader.dll.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x86</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Plugins\x64\PDFLoader.dll.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Plugins\x64</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Plugins\x86\PDFLoader.dll.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Plugins\x86</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Scripts.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Scripts\BasePlugin.cs">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Scripts\BasePlugin.cs.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Scripts\Mesh.cs">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader\Scripts\Mesh.cs.meta">
+      <Filter>PDFLoaderApp\Assets\PDFLoader\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Materials.meta">
+      <Filter>PDFLoaderApp\Assets</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Materials\VertexColor.mat">
+      <Filter>PDFLoaderApp\Assets\Materials</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Materials\VertexColor.mat.meta">
+      <Filter>PDFLoaderApp\Assets\Materials</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\PDFLoader.meta">
+      <Filter>PDFLoaderApp\Assets</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scenes.meta">
+      <Filter>PDFLoaderApp\Assets</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scenes\Sample.unity">
+      <Filter>PDFLoaderApp\Assets\Scenes</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scenes\Sample.unity.meta">
+      <Filter>PDFLoaderApp\Assets\Scenes</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scripts.meta">
+      <Filter>PDFLoaderApp\Assets</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scripts\Spin.cs">
+      <Filter>PDFLoaderApp\Assets\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Scripts\Spin.cs.meta">
+      <Filter>PDFLoaderApp\Assets\Scripts</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Shaders.meta">
+      <Filter>PDFLoaderApp\Assets</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Shaders\VertexColor.shader">
+      <Filter>PDFLoaderApp\Assets\Shaders</Filter>
+    </None>
+    <None Include="PDFLoaderApp\Assets\Shaders\VertexColor.shader.meta">
+      <Filter>PDFLoaderApp\Assets\Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="PDFLoaderApp">
+      <UniqueIdentifier>{00b8e006-6025-47c1-9661-98019daf6a6e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets">
+      <UniqueIdentifier>{7048cd8e-6bd9-459f-aebb-21664df35877}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader">
+      <UniqueIdentifier>{926e5524-6c08-4c70-9517-32e374d456f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins">
+      <UniqueIdentifier>{204a6c11-eb0b-4716-9bc4-328e12832aa3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins\WSA">
+      <UniqueIdentifier>{9642158c-f761-45b7-bb7a-a0399aeda84e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x86">
+      <UniqueIdentifier>{9e4424ce-96eb-4b24-a015-7dd05b63b57f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins\WSA\x64">
+      <UniqueIdentifier>{6bc95f0a-ef86-45ac-b75e-a3bcb245a692}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins\x64">
+      <UniqueIdentifier>{808b5158-8c86-40c7-8924-42015baff6d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Plugins\x86">
+      <UniqueIdentifier>{a7bc7341-62ea-429b-945f-822a70b65e01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\PDFLoader\Scripts">
+      <UniqueIdentifier>{1256f156-fe67-4fcc-b260-16cba63cac90}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\Materials">
+      <UniqueIdentifier>{17c24179-61cc-4114-beff-342af6949198</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\Scenes">
+      <UniqueIdentifier>{bd0733b9-0fb8-4375-86b3-01d157f6d6fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\Scripts">
+      <UniqueIdentifier>{3914fdf1-bb36-4dc1-93a5-48b453414483}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="PDFLoaderApp\Assets\Shaders">
+      <UniqueIdentifier>{30b54dbb-8726-4005-9280-85a71bc5dcd7}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

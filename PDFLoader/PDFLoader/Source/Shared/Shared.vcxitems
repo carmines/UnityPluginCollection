@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{bdbccf62-3980-4ced-8335-cf97a4f8bf24}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphics.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D11.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D12.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsD3D9.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityGraphicsMetal.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Unity\IUnityInterface.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)PlatformBase.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)UnityDeviceResource.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.Module.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)WICTextureLoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)UnityDeviceResource.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)PDFLoader_Dll.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)D3D11DeviceResources.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.Module.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)WICTextureLoader.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)PDFLoader_Dll.def" />
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl" />
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.PdfLoader.idl" />
+  </ItemGroup>
+</Project>

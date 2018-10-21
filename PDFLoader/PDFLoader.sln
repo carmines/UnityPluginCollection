@@ -1,0 +1,65 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2046
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitySample", "PDFLoader\UnitySample\UnitySample.vcxproj", "{F96A5114-5F2F-4BE3-BCF7-540645A14C76}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{E954C951-9A11-41E5-9C7E-86603D6368E2}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Shared", "PDFLoader\Source\Shared\Shared.vcxitems", "{BDBCCF62-3980-4CED-8335-CF97A4F8BF24}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UWP", "PDFLoader\Source\UWP\UWP.vcxproj", "{4F77DCAE-33E1-4E79-982D-897AC34F663F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Win32", "PDFLoader\Source\Win32\Win32.vcxproj", "{FC900374-92B1-4E86-BC86-C8D6E5391DB2}"
+EndProject
+Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		PDFLoader\Source\Shared\Shared.vcxitems*{4f77dcae-33e1-4e79-982d-897ac34f663f}*SharedItemsImports = 4
+		PDFLoader\Source\Shared\Shared.vcxitems*{bdbccf62-3980-4ced-8335-cf97a4f8bf24}*SharedItemsImports = 9
+		PDFLoader\Source\Shared\Shared.vcxitems*{fc900374-92b1-4e86-bc86-c8d6e5391db2}*SharedItemsImports = 4
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Debug|x64.ActiveCfg = Debug|x64
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Debug|x64.Build.0 = Debug|x64
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Debug|x86.ActiveCfg = Debug|Win32
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Debug|x86.Build.0 = Debug|Win32
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Release|x64.ActiveCfg = Release|x64
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Release|x64.Build.0 = Release|x64
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Release|x86.ActiveCfg = Release|Win32
+		{F96A5114-5F2F-4BE3-BCF7-540645A14C76}.Release|x86.Build.0 = Release|Win32
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Debug|x64.ActiveCfg = Debug|x64
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Debug|x64.Build.0 = Debug|x64
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Debug|x86.ActiveCfg = Debug|Win32
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Debug|x86.Build.0 = Debug|Win32
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Release|x64.ActiveCfg = Release|x64
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Release|x64.Build.0 = Release|x64
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Release|x86.ActiveCfg = Release|Win32
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F}.Release|x86.Build.0 = Release|Win32
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Debug|x64.ActiveCfg = Debug|x64
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Debug|x64.Build.0 = Debug|x64
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Debug|x86.ActiveCfg = Debug|Win32
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Debug|x86.Build.0 = Debug|Win32
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Release|x64.ActiveCfg = Release|x64
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Release|x64.Build.0 = Release|x64
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Release|x86.ActiveCfg = Release|Win32
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{BDBCCF62-3980-4CED-8335-CF97A4F8BF24} = {E954C951-9A11-41E5-9C7E-86603D6368E2}
+		{4F77DCAE-33E1-4E79-982D-897AC34F663F} = {E954C951-9A11-41E5-9C7E-86603D6368E2}
+		{FC900374-92B1-4E86-BC86-C8D6E5391DB2} = {E954C951-9A11-41E5-9C7E-86603D6368E2}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {62D33BF4-A69F-4D64-8D0E-158A054140D9}
+	EndGlobalSection
+EndGlobal
