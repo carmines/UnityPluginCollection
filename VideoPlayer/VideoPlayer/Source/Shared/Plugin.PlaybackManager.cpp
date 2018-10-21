@@ -333,13 +333,6 @@ HRESULT PlaybackManager::CreateResources(com_ptr<ID3D11Device> const& unityDevic
     com_ptr<IMFDXGIDeviceManager> dxgiDeviceManager;
     IFR(MFLockDXGIDeviceManager(&resetToken, dxgiDeviceManager.put()));
 
-    HANDLE dxgiHandle = nullptr;
-    HRESULT hr = dxgiDeviceManager->OpenDeviceHandle(&dxgiHandle);
-    if (SUCCEEDED(hr))
-    {
-
-    }
-
     // associtate the device with the manager
     IFR(dxgiDeviceManager->ResetDevice(d3dDevice.get(), resetToken));
     
