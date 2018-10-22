@@ -11,9 +11,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Plugin.CaptureEngine.cpp">
       <Filter>Plugin</Filter>
     </ClCompile>
-    <ClCompile Include="C:\code\UnityPluginCollection\CameraCapture\CameraCapture\Source\Shared\Media.Functions.cpp">
-      <Filter>Media</Filter>
-    </ClCompile>
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.AudioPayload.cpp">
       <Filter>Media\Capture</Filter>
     </ClCompile>
@@ -39,6 +36,9 @@
       <Filter>Media\Capture</Filter>
     </ClCompile>
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.SharedTexture.cpp">
+      <Filter>Media</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Functions.cpp">
       <Filter>Media</Filter>
     </ClCompile>
   </ItemGroup>
@@ -71,12 +71,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Plugin.CaptureEngine.h">
       <Filter>Plugin</Filter>
     </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)completion_source.h">
-      <Filter>Plugin</Filter>
-    </ClInclude>
-    <ClInclude Include="C:\code\UnityPluginCollection\CameraCapture\CameraCapture\Source\Shared\Media.Functions.h">
-      <Filter>Media</Filter>
-    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.AudioPayload.h">
       <Filter>Media\Capture</Filter>
     </ClInclude>
@@ -104,12 +98,13 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.SharedTexture.h">
       <Filter>Media</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Functions.h">
+      <Filter>Media</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)completion_source.h" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl">
-      <Filter>Plugin</Filter>
-    </Midl>
-    <Midl Include="C:\code\UnityPluginCollection\CameraCapture\CameraCapture\Source\Shared\Plugin.CaptureEngine.idl">
       <Filter>Plugin</Filter>
     </Midl>
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.AudioPayload.idl">
@@ -138,6 +133,9 @@
     </Midl>
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.VideoPayload.idl">
       <Filter>Media\Capture</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Plugin.CaptureEngine.idl">
+      <Filter>Plugin</Filter>
     </Midl>
   </ItemGroup>
   <ItemGroup>
