@@ -1,0 +1,21 @@
+#pragma once
+
+import "Media.Capture.idl";
+import "Media.Capture.Sink.idl";
+
+namespace CameraCapture.Media.Capture
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass StreamSink : Windows.Media.IMediaExtension
+    {
+        StreamSink(UInt8 index, Windows.Media.MediaProperties.IMediaEncodingProperties encodingProperties, Sink parent);
+
+        HRESULT Start(Int64 systemTime, Int64 clockStartOffset);
+        HRESULT Stop();
+        HRESULT Shutdown();
+
+        State State { get; set; };
+    };
+}

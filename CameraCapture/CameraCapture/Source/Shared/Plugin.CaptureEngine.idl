@@ -1,0 +1,21 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+import "Plugin.Module.idl";
+
+namespace CameraCapture.Plugin
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass CaptureEngine : Module
+    {
+        CaptureEngine();
+
+        HRESULT StartPreview(UInt32 width, UInt32 height, Boolean enableAudio, Boolean enableMrc);
+        HRESULT StopPreview();
+        Windows.Perception.Spatial.SpatialCoordinateSystem AppCoordinateSystem{ get; set; };
+    };
+}

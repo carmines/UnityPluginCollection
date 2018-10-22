@@ -1,0 +1,16 @@
+#pragma once
+
+import "Media.Capture.Payload.idl";
+
+namespace CameraCapture.Media.Capture
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass VideoPayload : Payload
+    {
+        VideoPayload();
+
+        Windows.Media.MediaProperties.VideoEncodingProperties VideoProperties { get; };
+    };
+}

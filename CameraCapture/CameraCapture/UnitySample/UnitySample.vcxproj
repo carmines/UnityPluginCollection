@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{15dc8982-b65a-4544-b864-964f7fcd4aae}</ProjectGuid>
+    <RootNamespace>Unity</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)Build\$(Configuration)\$(ProjectName)\$(PlatformShortName)\</OutDir>
+    <IntDir>$(SolutionDir)Temp\$(ProjectName)\$(Configuration)\$(PlatformShortName)\</IntDir>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <None Include="readme.txt" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\WSA\x64\CameraCapture.dll.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\WSA\x86\CameraCapture.dll.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\x64\CameraCapture.dll.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\x86\CameraCapture.dll.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\BasePlugin.cs" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\BasePlugin.cs.meta" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\Mesh.cs" />
+    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\Mesh.cs.meta" />
+    <None Include="CameraCaptureApp\Assets\Materials.meta" />
+    <None Include="CameraCaptureApp\Assets\Materials\VertexColor.mat" />
+    <None Include="CameraCaptureApp\Assets\Materials\VertexColor.mat.meta" />
+    <None Include="CameraCaptureApp\Assets\Scenes.meta" />
+    <None Include="CameraCaptureApp\Assets\Scenes\Sample.unity" />
+    <None Include="CameraCaptureApp\Assets\Scenes\Sample.unity.meta" />
+    <None Include="CameraCaptureApp\Assets\Scripts.meta" />
+    <None Include="CameraCaptureApp\Assets\Scripts\Spin.cs" />
+    <None Include="CameraCaptureApp\Assets\Scripts\Spin.cs.meta" />
+    <None Include="CameraCaptureApp\Assets\Shaders.meta" />
+    <None Include="CameraCaptureApp\Assets\Shaders\VertexColor.shader" />
+    <None Include="CameraCaptureApp\Assets\Shaders\VertexColor.shader.meta" />
+  </ItemGroup>
+</Project>

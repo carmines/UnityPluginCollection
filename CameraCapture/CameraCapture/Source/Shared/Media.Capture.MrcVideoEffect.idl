@@ -1,0 +1,22 @@
+#pragma once
+
+import "Media.Capture.idl";
+
+namespace CameraCapture.Media.Capture
+{
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass MrcVideoEffect : Windows.Media.Effects.IVideoEffectDefinition
+    {
+        MrcVideoEffect();
+
+        Single GlobalOpacityCoefficient { get; set; };
+        Boolean HologramCompositionEnabled { get; set; };
+        Boolean RecordingIndicatorEnabled { get; set; };
+        Windows.Media.Capture.MediaStreamType StreamType { get; set; };
+        Boolean VideoStabilizationEnabled { get; set; };
+        UInt32 VideoStabilizationBufferLength { get; set; };
+        UInt32 VideoStabilizationMaximumBufferLength { get; };
+    };
+}

@@ -1,0 +1,15 @@
+#pragma once
+
+namespace CameraCapture.Media.Capture
+{
+    [version(1.0)]
+    enum State
+    {
+        Ready,
+        Started,
+        Paused,
+        Stopped,
+        Eos,
+        Shutdown
+    };
+}

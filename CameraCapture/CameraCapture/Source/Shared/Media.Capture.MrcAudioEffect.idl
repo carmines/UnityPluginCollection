@@ -1,0 +1,24 @@
+#pragma once
+
+import "Media.Capture.idl";
+
+namespace CameraCapture.Media.Capture
+{
+    [version(1.0)]
+    enum AudioMixerMode
+    {
+        Mic,
+        Loopback,
+        MicAndLoopback
+    };
+
+    [version(1.0)]
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    runtimeclass MrcAudioEffect : Windows.Media.Effects.IAudioEffectDefinition
+    {
+        MrcAudioEffect();
+
+        AudioMixerMode MixerMode { get; set; };
+    };
+}
