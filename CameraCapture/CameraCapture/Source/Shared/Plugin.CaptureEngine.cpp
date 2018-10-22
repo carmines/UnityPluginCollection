@@ -113,7 +113,7 @@ HRESULT CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
     }
 
     m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([=](auto const& asyncOp, AsyncStatus const& status)
+    m_startPreviewOp.Completed([=](auto const asyncOp, AsyncStatus const status)
     {
         UNREFERENCED_PARAMETER(asyncOp);
 
@@ -153,7 +153,7 @@ HRESULT CaptureEngine::StopPreview()
     }
 
     m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([=](auto const& asyncOp, AsyncStatus const& status)
+    m_stopPreviewOp.Completed([=](auto const asyncOp, AsyncStatus const status)
     {
         UNREFERENCED_PARAMETER(asyncOp);
 
@@ -346,8 +346,17 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 
     auto guard = slim_lock_guard(m_mutex);
 
-    m_sampleEventToken = m_payloadHandler.OnSample([this](auto const&, Media::Capture::Payload const& payload)
+    m_sampleEventToken = m_payloadHandler.OnSample([this](auto const sender, Media::Capture::Payload const payload)
     {
+        UNREFERENCED_PARAMETER(sender);
+
+        auto guard = slim_lock_guard(m_mutex);
+
+        if (m_isShutdown)
+        {
+            return;
+        }
+
         auto streamSample = payload.as<IStreamSample>();
         if (streamSample == nullptr)
         {

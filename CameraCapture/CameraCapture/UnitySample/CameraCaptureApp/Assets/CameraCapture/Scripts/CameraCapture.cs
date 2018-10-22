@@ -19,7 +19,7 @@ namespace CameraCapture
         public Boolean enableAudio = false;
         public Boolean enableMrc = false;
 
-        public CameraVisualizer cameraVisualizer = null;
+        public SpatialCameraTracker cameraTracker = null;
 
         private Texture2D videoTexture = null;
 
@@ -126,9 +126,9 @@ namespace CameraCapture
             }
 
             // upate object using this information
-            if (cameraVisualizer != null)
+            if (cameraTracker != null)
             {
-                cameraVisualizer.UpdateCameraMatrices(state.cameraWorld, state.cameraProjection);
+                cameraTracker.UpdateCameraMatrices(state.cameraWorld, state.cameraProjection);
             }
         }
 

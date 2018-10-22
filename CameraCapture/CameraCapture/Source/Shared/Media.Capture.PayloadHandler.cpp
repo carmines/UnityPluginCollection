@@ -74,7 +74,7 @@ HRESULT PayloadHandler::Invoke(
     
     if (m_sampleEvent)
     {
-        m_sampleEvent(nullptr, payload);
+        m_sampleEvent(*this, payload);
     }
 
     return pAsyncResult->SetStatus(hr);
