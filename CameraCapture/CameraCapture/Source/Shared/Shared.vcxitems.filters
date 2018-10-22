@@ -101,7 +101,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Functions.h">
       <Filter>Media</Filter>
     </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)completion_source.h" />
   </ItemGroup>
   <ItemGroup>
     <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl">

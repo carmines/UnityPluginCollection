@@ -213,7 +213,7 @@ HRESULT StreamSink::PlaceMarker(
 
     if (State() == State::Paused || State() == State::Stopped)
     {
-        return MF_E_INVALIDREQUEST;
+        IFR(MF_E_INVALIDREQUEST);
     }
 
     if (eMarkerType == MFSTREAMSINK_MARKER_TYPE::MFSTREAMSINK_MARKER_ENDOFSEGMENT)

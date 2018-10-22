@@ -4,6 +4,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitySample", "CameraCapture\UnitySample\UnitySample.vcxproj", "{15DC8982-B65A-4544-B864-964F7FCD4AAE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{FE6F0CAF-1C27-483E-BA9E-6264A6116848} = {FE6F0CAF-1C27-483E-BA9E-6264A6116848}
+		{C379EADF-EC52-4C6D-A12D-8101DC27939B} = {C379EADF-EC52-4C6D-A12D-8101DC27939B}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Source", "Source", "{2E596D53-AE89-41BB-8F0D-50B4CBE6E8CE}"
 EndProject

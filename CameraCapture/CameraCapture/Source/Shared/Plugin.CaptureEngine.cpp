@@ -11,6 +11,8 @@
 #include <mferror.h>
 #include <mfmediacapture.h>
 
+#include <pplawait.h>
+
 using namespace winrt;
 using namespace CameraCapture::Plugin::implementation;
 using namespace CameraCapture::Media::Capture::implementation;
@@ -20,12 +22,6 @@ using namespace Windows::Media::Capture;
 using namespace Windows::Media::MediaProperties;
 
 using winrtCaptureEngine = CameraCapture::Plugin::CaptureEngine;
-
-IAsyncOperation<boolean> WaitForCompletion(completion_source<boolean>& completion)
-{
-    co_return co_await completion;
-}
-
 
 CameraCapture::Plugin::IModule CaptureEngine::Create(
     _In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice,
@@ -44,12 +40,10 @@ CameraCapture::Plugin::IModule CaptureEngine::Create(
 
 CaptureEngine::CaptureEngine()
     : m_isShutdown(false)
-    , m_stopCompletion()
     , m_startPreviewOp(nullptr)
     , m_stopPreviewOp(nullptr)
     , m_streamType(MediaStreamType::VideoPreview)
     , m_mediaCapture(nullptr)
-    , m_failedEventToken()
     , m_mrcAudioEffect(nullptr)
     , m_mrcVideoEffect(nullptr)
     , m_mrcPreviewEffect(nullptr)
@@ -87,11 +81,16 @@ void CaptureEngine::Shutdown()
 
     if (m_mediaCapture != nullptr)
     {
-        auto asyncWait = WaitForCompletion(m_stopCompletion);
-
-        auto asyncStop = StopPreviewAsync();
-
-        asyncWait.get();
+        concurrency::create_task([=]
+        {
+            try
+            {
+                StopPreviewCoroutine().get();
+            }
+            catch (...)
+            {
+            }
+        }).get();
     }
 
     ReleaseDeviceResources();
@@ -103,30 +102,26 @@ HRESULT CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 {
     auto guard = slim_lock_guard(m_mutex);
 
-    if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
-    {
-        IFR(MF_E_MULTIPLE_BEGIN);
-    }
-
     if (m_mediaCapture != nullptr)
     {
         IFR(MF_E_ALREADY_INITIALIZED);
     }
 
-    m_startPreviewOp = StartPreviewAsync(width, height, enableAudio, enableMrc);
+    if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
+    {
+        IFR(MF_E_MULTIPLE_BEGIN);
+    }
+
+    m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
     m_startPreviewOp.Completed([=](auto const& asyncOp, AsyncStatus const& status)
     {
         UNREFERENCED_PARAMETER(asyncOp);
 
-        if (status == AsyncStatus::Canceled)
-        {
-            return;
-        }
-        else if (status == AsyncStatus::Error)
+        if (status == AsyncStatus::Error)
         {
             Failed();
         }
-        else
+        else if (status == AsyncStatus::Completed)
         {
             CALLBACK_STATE state{};
             ZeroMemory(&state, sizeof(CALLBACK_STATE));
@@ -139,6 +134,8 @@ HRESULT CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 
             Callback(state);
         }
+
+        m_startPreviewOp = nullptr;
     });
 
     return S_OK;
@@ -148,15 +145,116 @@ HRESULT CaptureEngine::StopPreview()
 {
     auto guard = slim_lock_guard(m_mutex);
 
+    NULL_CHK_HR(m_mediaCapture, S_OK);
+
+    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+    {
+        IFR(MF_E_MULTIPLE_BEGIN);
+    }
+
+    m_stopPreviewOp = StopPreviewCoroutine();
+    m_stopPreviewOp.Completed([=](auto const& asyncOp, AsyncStatus const& status)
+    {
+        UNREFERENCED_PARAMETER(asyncOp);
+
+        if (status == AsyncStatus::Error)
+        {
+            Failed();
+        }
+        else if (status == AsyncStatus::Completed)
+        {
+            CALLBACK_STATE state{};
+            ZeroMemory(&state, sizeof(CALLBACK_STATE));
+
+            state.type = CallbackType::Capture;
+
+            ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
+
+            state.value.captureState.stateType = CaptureStateType::PreviewStopped;
+
+            Callback(state);
+        }
+
+        m_stopPreviewOp = nullptr;
+    });
+
     return S_OK;
 }
 
-
 // private
-IAsyncAction CaptureEngine::StartPreviewAsync(
-    uint32_t width, uint32_t height, 
-    boolean enableAudio, boolean enableMrc)
+HRESULT CaptureEngine::CreateDeviceResources()
 {
+    if (m_d3dDevice != nullptr && m_dxgiDeviceManager != nullptr)
+    {
+        return S_OK;
+    }
+
+    auto resources = m_deviceResources.lock();
+    NULL_CHK_HR(resources, MF_E_UNEXPECTED);
+
+    com_ptr<ID3D11DeviceResource> spD3D11Resources;
+    IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
+
+    com_ptr<IDXGIDevice> dxgiDevice = nullptr;
+    IFR(spD3D11Resources->GetDevice()->QueryInterface(guid_of<IDXGIDevice>(), dxgiDevice.put_void()));
+
+    com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
+    IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
+
+    com_ptr<ID3D11Device> d3dDevice = nullptr;
+    IFR(CreateMediaDevice(dxgiAdapter.get(), d3dDevice.put()));
+
+    // create DXGIManager
+    uint32_t resetToken;
+    com_ptr<IMFDXGIDeviceManager> dxgiDeviceManager = nullptr;
+    IFR(MFCreateDXGIDeviceManager(&resetToken, dxgiDeviceManager.put()));
+
+    // associate device with dxgiManager
+    IFR(dxgiDeviceManager->ResetDevice(d3dDevice.get(), resetToken));
+
+    // success, store the values
+    m_d3dDevice.attach(d3dDevice.detach());
+    m_dxgiDeviceManager.attach(dxgiDeviceManager.detach());
+    m_resetToken = resetToken;
+
+    return S_OK;
+}
+
+void CaptureEngine::ReleaseDeviceResources()
+{
+    if (m_audioSample != nullptr)
+    {
+        m_audioSample = nullptr;
+    }
+
+    if (m_videoBuffer != nullptr)
+    {
+        m_videoBuffer->Reset();
+
+        m_videoBuffer = nullptr;
+    }
+
+    if (m_dxgiDeviceManager != nullptr)
+    {
+        m_dxgiDeviceManager = nullptr;
+    }
+
+    if (m_d3dDevice != nullptr)
+    {
+        m_d3dDevice = nullptr;
+    }
+}
+
+
+IAsyncAction CaptureEngine::StartPreviewCoroutine(
+    uint32_t const width, uint32_t const height,
+    boolean const enableAudio, boolean const enableMrc)
+{
+    // make sure this is on the calling thread
+    IFT(CreateDeviceResources());
+
+    winrt::apartment_context calling_thread;
+
     co_await resume_background();
 
     if (m_mediaCapture == nullptr)
@@ -244,24 +342,9 @@ IAsyncAction CaptureEngine::StartPreviewAsync(
     m_mediaSink = mediaSink;
     m_payloadHandler = payloadHandler;
 
-    // setup events
-    m_failedEventToken = m_mediaCapture.Failed(([=](auto const& sender, MediaCaptureFailedEventArgs const& args)
-    {
-        UNREFERENCED_PARAMETER(sender);
+    co_await calling_thread; // switch back to calling context
 
-        CALLBACK_STATE state{};
-        ZeroMemory(&state, sizeof(CALLBACK_STATE));
-
-        state.type = CallbackType::Failed;
-
-        ZeroMemory(&state.value.failedState, sizeof(FAILED_STATE));
-
-        static const hstring errorMessege = args.Message();
-
-        state.value.failedState.hresult = args.Code();
-
-        Callback(state);
-    }));
+    auto guard = slim_lock_guard(m_mutex);
 
     m_sampleEventToken = m_payloadHandler.OnSample([this](auto const&, Media::Capture::Payload const& payload)
     {
@@ -367,15 +450,18 @@ IAsyncAction CaptureEngine::StartPreviewAsync(
             }
         }
     });
-
-    m_stopPreviewOp = nullptr;
-    m_stopCompletion.reset();
-
-    co_return;
 }
 
-IAsyncAction CaptureEngine::StopPreviewAsync()
+IAsyncAction CaptureEngine::StopPreviewCoroutine()
 {
+    winrt::apartment_context calling_thread;
+
+    // callee should have a lock on the mutex
+    if (m_payloadHandler != nullptr)
+    {
+        m_payloadHandler.OnSample(m_sampleEventToken);
+    }
+
     co_await resume_background();
 
     if (m_mediaSink != nullptr)
@@ -386,14 +472,11 @@ IAsyncAction CaptureEngine::StopPreviewAsync()
 
     if (m_payloadHandler != nullptr)
     {
-        m_payloadHandler.OnSample(m_sampleEventToken);
         m_payloadHandler = nullptr;
     }
 
     if (m_mediaCapture != nullptr)
     {
-        m_mediaCapture.Failed(m_failedEventToken);
-
         if (m_streamType == MediaStreamType::VideoRecord)
         {
             co_await m_mediaCapture.StopRecordAsync();
@@ -406,23 +489,18 @@ IAsyncAction CaptureEngine::StopPreviewAsync()
         co_await ReleaseMediaCaptureAsync();
     }
 
-    // complete trigger completion
-    m_stopCompletion.set(true);
-
-    co_return;
+    co_await calling_thread; // switch back to calling context
 }
 
 
 IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
-    boolean enableAudio,
-    MediaCategory category)
+    boolean const enableAudio,
+    MediaCategory const category)
 {
     if (m_mediaCapture != nullptr)
     {
         co_return;
     }
-
-    IFT(CreateDeviceResources());
 
     auto initSettings = MediaCaptureInitializationSettings();
 
@@ -455,8 +533,6 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
 
 IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
 {
-    co_await resume_background();
-
     if (m_mediaCapture == nullptr)
     {
         co_return;
@@ -467,77 +543,11 @@ IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
     m_mediaCapture.Close();
 
     m_mediaCapture = nullptr;
-
-    co_return;
-}
-
-
-HRESULT CaptureEngine::CreateDeviceResources()
-{
-    if (m_d3dDevice != nullptr && m_dxgiDeviceManager != nullptr)
-    {
-        return S_OK;
-    }
-
-    auto resources = m_deviceResources.lock();
-    NULL_CHK_HR(resources, MF_E_UNEXPECTED);
-
-    com_ptr<ID3D11DeviceResource> spD3D11Resources;
-    IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
-
-    com_ptr<IDXGIDevice> dxgiDevice = nullptr;
-    IFR(spD3D11Resources->GetDevice()->QueryInterface(guid_of<IDXGIDevice>(), dxgiDevice.put_void()));
-
-    com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
-    IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
-
-    com_ptr<ID3D11Device> d3dDevice = nullptr;
-    IFR(CreateMediaDevice(dxgiAdapter.get(), d3dDevice.put()));
-
-    // create DXGIManager
-    uint32_t resetToken;
-    com_ptr<IMFDXGIDeviceManager> dxgiDeviceManager = nullptr;
-    IFR(MFCreateDXGIDeviceManager(&resetToken, dxgiDeviceManager.put()));
-
-    // associate device with dxgiManager
-    IFR(dxgiDeviceManager->ResetDevice(d3dDevice.get(), resetToken));
-
-    // success, store the values
-    m_d3dDevice.attach(d3dDevice.detach());
-    m_dxgiDeviceManager.attach(dxgiDeviceManager.detach());
-    m_resetToken = resetToken;
-
-    return S_OK;
-}
-
-void CaptureEngine::ReleaseDeviceResources()
-{
-    if (m_audioSample != nullptr)
-    {
-        m_audioSample = nullptr;
-    }
-
-    if (m_videoBuffer != nullptr)
-    {
-        m_videoBuffer->Reset();
-
-        m_videoBuffer = nullptr;
-    }
-
-    if (m_dxgiDeviceManager != nullptr)
-    {
-        m_dxgiDeviceManager = nullptr;
-    }
-
-    if (m_d3dDevice != nullptr)
-    {
-        m_d3dDevice = nullptr;
-    }
 }
 
 
 IAsyncAction CaptureEngine::AddMrcEffectsAsync(
-    boolean enableAudio)
+    boolean const enableAudio)
 {
     if (m_mediaCapture == nullptr)
     {
@@ -572,6 +582,8 @@ IAsyncAction CaptureEngine::AddMrcEffectsAsync(
     {
         Log(L"failed to add Mrc effects to streams: %s", e.message().c_str());
     }
+
+    co_return;
 }
 
 IAsyncAction CaptureEngine::RemoveMrcEffectsAsync()
@@ -598,4 +610,6 @@ IAsyncAction CaptureEngine::RemoveMrcEffectsAsync()
         co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
         m_mrcVideoEffect = nullptr;
     }
+
+    co_return;
 }

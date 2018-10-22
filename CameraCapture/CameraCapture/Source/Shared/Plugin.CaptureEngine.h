@@ -8,7 +8,6 @@
 #include "Media.Capture.Sink.h"
 #include "Media.Capture.PayloadHandler.h"
 #include "Media.SharedTexture.h"
-#include "completion_source.h"
 
 #include <mfapi.h>
 #include <winrt/windows.media.h>
@@ -39,16 +38,16 @@ namespace winrt::CameraCapture::Plugin::implementation
         }
 
     private:
-        Windows::Foundation::IAsyncAction StartPreviewAsync(uint32_t width, uint32_t height, boolean enableAudio, boolean enableMrc);
-        Windows::Foundation::IAsyncAction StopPreviewAsync();
-
-        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(boolean enableAudio, Windows::Media::Capture::MediaCategory category);
-        Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
-
         HRESULT CreateDeviceResources();
         void ReleaseDeviceResources();
 
-        Windows::Foundation::IAsyncAction AddMrcEffectsAsync(boolean enableAudio);
+        Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
+        Windows::Foundation::IAsyncAction StopPreviewCoroutine();
+
+        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(boolean const enableAudio, Windows::Media::Capture::MediaCategory const category);
+        Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
+
+        Windows::Foundation::IAsyncAction AddMrcEffectsAsync(boolean const enableAudio);
         Windows::Foundation::IAsyncAction RemoveMrcEffectsAsync();
 
     private:
@@ -57,7 +56,6 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction m_startPreviewOp;
         Windows::Foundation::IAsyncAction m_stopPreviewOp;
-        completion_source<boolean> m_stopCompletion;
 
         com_ptr<ID3D11Device> m_d3dDevice;
         uint32_t m_resetToken;
@@ -66,7 +64,6 @@ namespace winrt::CameraCapture::Plugin::implementation
         // media capture
         Windows::Media::Capture::MediaStreamType m_streamType;
         Windows::Media::Capture::MediaCapture m_mediaCapture;
-        event_token m_failedEventToken;
 
         Windows::Media::IMediaExtension m_mrcAudioEffect;
         Windows::Media::IMediaExtension m_mrcVideoEffect;

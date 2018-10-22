@@ -14,7 +14,6 @@
     <ProjectCapability Include="SourceItemsFromImports" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="$(MSBuildThisFileDirectory)completion_source.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.AudioPayload.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.MrcAudioEffect.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.h" />

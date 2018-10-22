@@ -39,28 +39,5 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemGroup>
     <None Include="readme.txt" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\WSA\x64\CameraCapture.dll.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\WSA\x86\CameraCapture.dll.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\x64\CameraCapture.dll.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Plugins\x86\CameraCapture.dll.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\BasePlugin.cs" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\BasePlugin.cs.meta" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\Mesh.cs" />
-    <None Include="CameraCaptureApp\Assets\CameraCapture\Scripts\Mesh.cs.meta" />
-    <None Include="CameraCaptureApp\Assets\Materials.meta" />
-    <None Include="CameraCaptureApp\Assets\Materials\VertexColor.mat" />
-    <None Include="CameraCaptureApp\Assets\Materials\VertexColor.mat.meta" />
-    <None Include="CameraCaptureApp\Assets\Scenes.meta" />
-    <None Include="CameraCaptureApp\Assets\Scenes\Sample.unity" />
-    <None Include="CameraCaptureApp\Assets\Scenes\Sample.unity.meta" />
-    <None Include="CameraCaptureApp\Assets\Scripts.meta" />
-    <None Include="CameraCaptureApp\Assets\Scripts\Spin.cs" />
-    <None Include="CameraCaptureApp\Assets\Scripts\Spin.cs.meta" />
-    <None Include="CameraCaptureApp\Assets\Shaders.meta" />
-    <None Include="CameraCaptureApp\Assets\Shaders\VertexColor.shader" />
-    <None Include="CameraCaptureApp\Assets\Shaders\VertexColor.shader.meta" />
   </ItemGroup>
 </Project>
