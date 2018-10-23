@@ -43,10 +43,21 @@ public class CameraVisualizer : MonoBehaviour
             farPlaneRenderer.positionCount = 4;
         }
 
-        const float smooth = 5f;
-        Vector3 cameraPos = cameraTracker.spatialCamera.transform.position;
+        // increase nearplane size
+        const float scaleAmount = 4f;
         Bounds nearBounds = new Bounds();
         Bounds farBounds = new Bounds();
+        float smooth = Time.deltaTime * 5f;
+        Vector3 cameraPos = cameraTracker.spatialCamera.transform.position;
+
+        // update the offset from main camera to spatial camera
+        if (Position != null)
+        {
+            Vector3 mainPos = Camera.main.transform.position;
+            Vector3 mainToSpatialOffset = cameraPos - mainPos;
+
+            Position.localPosition = Vector3.Lerp(Position.localPosition, mainToSpatialOffset, smooth);
+        }
 
         // update corner verticies
         for (int i = 0; i < 4; i++)
@@ -54,9 +65,9 @@ public class CameraVisualizer : MonoBehaviour
             if (nearPlaneRenderer != null)
             {
                 // calc relative offset
-                Vector3 offset = (cameraTracker.NearCorners[i] - cameraPos) * 4;
+                Vector3 offset = (cameraTracker.NearCorners[i] - cameraPos) * scaleAmount;
                 Vector3 currentPos = nearPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, Time.deltaTime * smooth);
+                Vector3 newPos = Vector3.Lerp(currentPos, offset, smooth);
                 nearPlaneRenderer.SetPosition(i, newPos);
 
                 if (i < Corners.Length)
@@ -69,22 +80,13 @@ public class CameraVisualizer : MonoBehaviour
 
             if (farPlaneRenderer != null)
             {
-                Vector3 offset = (cameraTracker.FarCorners[i] - cameraPos) * 4;
+                Vector3 offset = (cameraTracker.FarCorners[i] - cameraPos);
                 Vector3 currentPos = farPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, Time.deltaTime * smooth);
+                Vector3 newPos = Vector3.Lerp(currentPos, offset, smooth);
                 farPlaneRenderer.SetPosition(i, newPos);
 
                 farBounds.Expand(newPos);
             }
-        }
-
-        // update the offset from main camera to spatial camera
-        if (Position != null)
-        {
-            Vector3 mainPos = Camera.main.transform.position;
-            Vector3 mainToSpatialOffset = cameraPos - mainPos;
-
-            Position.localPosition = Vector3.Lerp(Position.localPosition, mainToSpatialOffset, Time.deltaTime * smooth);
         }
     }
 }
