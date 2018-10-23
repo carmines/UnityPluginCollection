@@ -16,7 +16,7 @@ public class SpatialCameraTracker : MonoBehaviour
     private SpatialTranformHelper.Matrix4x4 cameraProjection;
     private SpatialTranformHelper.Matrix4x4 lastGoodCameraProjection;
 
-    public float fov, aspectRatio, nearPlane, farPlane;
+    private float fov, aspectRatio, nearPlane, farPlane;
     private UnityEngine.Matrix4x4 defaultCameraProjection;
 
     private bool wasUpdated = false;

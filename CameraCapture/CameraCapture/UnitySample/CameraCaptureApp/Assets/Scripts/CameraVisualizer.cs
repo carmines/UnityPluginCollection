@@ -43,7 +43,7 @@ public class CameraVisualizer : MonoBehaviour
             farPlaneRenderer.positionCount = 4;
         }
 
-        const float lerpAmount = 0.2f;
+        const float smooth = 5f;
         Vector3 cameraPos = cameraTracker.spatialCamera.transform.position;
         Bounds nearBounds = new Bounds();
         Bounds farBounds = new Bounds();
@@ -56,7 +56,7 @@ public class CameraVisualizer : MonoBehaviour
                 // calc relative offset
                 Vector3 offset = (cameraTracker.NearCorners[i] - cameraPos) * 4;
                 Vector3 currentPos = nearPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, lerpAmount);
+                Vector3 newPos = Vector3.Lerp(currentPos, offset, Time.deltaTime * smooth);
                 nearPlaneRenderer.SetPosition(i, newPos);
 
                 if (i < Corners.Length)
@@ -71,7 +71,7 @@ public class CameraVisualizer : MonoBehaviour
             {
                 Vector3 offset = (cameraTracker.FarCorners[i] - cameraPos) * 4;
                 Vector3 currentPos = farPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, lerpAmount);
+                Vector3 newPos = Vector3.Lerp(currentPos, offset, Time.deltaTime * smooth);
                 farPlaneRenderer.SetPosition(i, newPos);
 
                 farBounds.Expand(newPos);
@@ -84,10 +84,7 @@ public class CameraVisualizer : MonoBehaviour
             Vector3 mainPos = Camera.main.transform.position;
             Vector3 mainToSpatialOffset = cameraPos - mainPos;
 
-            Vector3 center = nearBounds.center;
-            Vector3 forward = (farBounds.center - nearBounds.center).normalized;
-
-            Position.position = transform.position + mainToSpatialOffset;
+            Position.localPosition = Vector3.Lerp(Position.localPosition, mainToSpatialOffset, Time.deltaTime * smooth);
         }
     }
 }
