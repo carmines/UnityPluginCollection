@@ -78,29 +78,16 @@ public class CameraVisualizer : MonoBehaviour
             }
         }
 
-        // update markers
+        // update the offset from main camera to spatial camera
         if (Position != null)
         {
+            Vector3 mainPos = Camera.main.transform.position;
+            Vector3 mainToSpatialOffset = cameraPos - mainPos;
+
             Vector3 center = nearBounds.center;
             Vector3 forward = (farBounds.center - nearBounds.center).normalized;
 
-            Position.localPosition = (center - (forward * cameraTracker.spatialCamera.nearClipPlane));
+            Position.position = transform.position + mainToSpatialOffset;
         }
     }
-
-
-    //private void OnDrawGizmos()
-    //{
-    //    if (nearCorners == null || farCorners == null || nearCorners.Length != 4 || farCorners.Length != 4)
-    //    {
-    //        return;
-    //    }
-
-    //    for (int i = 0; i < 4; i++)
-    //    {
-    //        Debug.DrawLine(nearCorners[i], nearCorners[(i + 1) % 4], Color.red, Time.deltaTime, true); // near corners on the created projection matrix
-    //        Debug.DrawLine(farCorners[i], farCorners[(i + 1) % 4], Color.blue, Time.deltaTime, true); // far corners on the created projection matrix
-    //        Debug.DrawLine(nearCorners[i], farCorners[i], Color.green, Time.deltaTime, true); // sides of the created projection matrix
-    //    }
-    //}
 }
