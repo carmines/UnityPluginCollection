@@ -64,7 +64,7 @@ public class SpatialCameraTracker : MonoBehaviour
         {
             return;
         }
-        //wasUpdated = false;
+        wasUpdated = false;
 
         // get the latest planes
         GeometryUtility.CalculateFrustumPlanes(spatialCamera, cameraPlanes);
@@ -125,10 +125,10 @@ public class SpatialCameraTracker : MonoBehaviour
             spatialCamera.projectionMatrix = currentCameraProjection.Value;
         }
 
-        //if (currentCameraPose == null)
-        //{
-        //     return;
-        //}
+        if (currentCameraPose == null)
+        {
+             return;
+        }
 
         if (cameraPlanes == null)
         {
