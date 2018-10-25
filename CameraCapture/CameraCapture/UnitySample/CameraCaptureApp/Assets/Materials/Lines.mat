@@ -6,9 +6,9 @@ Material:
   m_ObjectHideFlags: 0
   m_PrefabParentObject: {fileID: 0}
   m_PrefabInternal: {fileID: 0}
-  m_Name: spatialposition
+  m_Name: Lines
   m_Shader: {fileID: 4800000, guid: 20f03e0302567cc4596cdd5744fb9e69, type: 3}
-  m_ShaderKeywords: _BORDER_LIGHT_USES_HOVER_COLOR _DIRECTIONAL_LIGHT _HOVER_LIGHT
+  m_ShaderKeywords: _SPECULARHIGHLIGHTS_OFF
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -63,7 +63,7 @@ Material:
     - _BlendOp: 0
     - _BorderLight: 0
     - _BorderLightOpaque: 0
-    - _BorderLightUsesHoverColor: 1
+    - _BorderLightUsesHoverColor: 0
     - _BorderMinValue: 0.1
     - _BorderWidth: 0.1
     - _Brightness: 1
@@ -76,7 +76,7 @@ Material:
     - _CustomMode: 0
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
-    - _DirectionalLight: 1
+    - _DirectionalLight: 0
     - _DstBlend: 0
     - _EdgeSmoothingValue: 0.002
     - _EnableEmission: 0
@@ -91,7 +91,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _HoverLight: 1
+    - _HoverLight: 0
     - _HoverLightOpaque: 0
     - _InnerGlow: 0
     - _Metallic: 0
@@ -117,8 +117,8 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _ClipPlane: {r: 0, g: 1, b: 0, a: 0}
-    - _ClippingPlaneBorderColor: {r: 1, g: 0.2, b: 0, a: 1}
-    - _Color: {r: 0.7794118, g: 0.47001848, b: 0.18912198, a: 1}
+    - _ClippingPlaneBorderColor: {r: 0.97794116, g: 0.7650952, b: 0.71188366, a: 1}
+    - _Color: {r: 0.9411765, g: 0.09803922, b: 0.09803922, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _EmissiveColor: {r: 0, g: 0, b: 0, a: 1}
     - _EnvironmentColorX: {r: 1, g: 0, b: 0, a: 1}

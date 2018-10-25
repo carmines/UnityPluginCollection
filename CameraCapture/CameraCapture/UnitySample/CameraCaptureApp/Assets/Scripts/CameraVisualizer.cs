@@ -23,6 +23,11 @@ public class CameraVisualizer : MonoBehaviour
 
             return;
         }
+
+        if (imgbounds != null && imgbounds.positionCount != 4)
+        {
+            imgbounds.positionCount = 4;
+        }
     }
 
     private void Update()
@@ -32,14 +37,8 @@ public class CameraVisualizer : MonoBehaviour
             return;
         }
 
-        if (imgbounds != null && imgbounds.positionCount != 4)
-        {
-            imgbounds.positionCount = 4;
-        }
-
         // increase nearplane size
-        const float scaleAmount = 4f;
-        float smooth = Time.deltaTime * 5f;
+        float smooth = Time.deltaTime * 10.0f;
         Vector3 cameraPos = cameraTracker.transform.position;
 
         // update the offset from main camera to spatial camera
@@ -58,7 +57,7 @@ public class CameraVisualizer : MonoBehaviour
 
             if (i < corners.Length)
             {
-                corners[i].position = imgbounds.GetPosition(i);
+                corners[i].localPosition = imgbounds.GetPosition(i);
             }
         }
     }

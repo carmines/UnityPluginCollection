@@ -3,19 +3,18 @@ using UnityEngine;
 
 using Spatial4x4 = SpatialTranformHelper.Matrix4x4;
 
-[RequireComponent(typeof(Camera))]
 public class SpatialCameraTracker : MonoBehaviour
 {
-    public Vector3[] ImageCorners { get; private set; }
     public Vector3 ImageCenter { get; private set; }
-
-    private Vector2[] viewport = new Vector2[] { new Vector2(0.0f, 0.0f),  new Vector2(0.0f, 1.0f), new Vector2(1.0f, 1.0f), new Vector2(1.0f, 0.0f) };
+    public Vector3[] ImageCorners { get; private set; }
 
     private Spatial4x4 cameraTransform = Spatial4x4.Zero;
     private Spatial4x4 lastGoodCameraTransform = Spatial4x4.Zero;
 
     private Spatial4x4 cameraProjection = Spatial4x4.Zero;
     private Spatial4x4 lastGoodCameraProjection = Spatial4x4.Zero;
+
+    private readonly Vector2[] viewport = new Vector2[] { new Vector2(0.0f, 0.0f),  new Vector2(0.0f, 1.0f), new Vector2(1.0f, 1.0f), new Vector2(1.0f, 0.0f) };
 
     private void Awake()
     {
@@ -50,10 +49,14 @@ public class SpatialCameraTracker : MonoBehaviour
         cameraProjection = projection;
 
         // get last known good transform
-        Matrix4x4? tranformMatrix = cameraTransform.ToUnityTransform();
-        if (tranformMatrix == null)
+        Matrix4x4? transformMatrix = null;
+        if (cameraTransform != Spatial4x4.Zero)
         {
-            tranformMatrix = lastGoodCameraTransform.ToUnityTransform();
+            transformMatrix = cameraTransform.ToUnityTransform();
+        }
+        else if (lastGoodCameraTransform != Spatial4x4.Zero)
+        {
+            transformMatrix = lastGoodCameraTransform.ToUnityTransform();
         }
 
         // swap the projection for the one sent to us
@@ -67,16 +70,16 @@ public class SpatialCameraTracker : MonoBehaviour
             projectionMatrix = cameraProjection.ToUnity();
         }
 
-        if (tranformMatrix == null || projectionMatrix == null)
+        if (transformMatrix == null || projectionMatrix == null)
         {
              return;
         }
 
         // set the real worl position to PV camera pose
-        if (tranformMatrix.Value.ValidTRS())
+        if (transformMatrix.Value.ValidTRS())
         {
-            gameObject.transform.position = tranformMatrix.Value.GetColumn(3);
-            gameObject.transform.rotation = Quaternion.LookRotation(tranformMatrix.Value.GetColumn(2), tranformMatrix.Value.GetColumn(1));
+            gameObject.transform.position = transformMatrix.Value.GetColumn(3);
+            gameObject.transform.rotation = Quaternion.LookRotation(transformMatrix.Value.GetColumn(2), transformMatrix.Value.GetColumn(1));
         }
 
         if (ImageCorners == null)
@@ -84,20 +87,20 @@ public class SpatialCameraTracker : MonoBehaviour
             ImageCorners = new Vector3[4];
         }
 
-        ImageCenter = WorldPoint(new Vector2(.5f, .5f), tranformMatrix.Value, projectionMatrix.Value);
+        ImageCenter = WorldPoint(new Vector2(.5f, .5f), transformMatrix.Value, projectionMatrix.Value);
 
         for (int i = 0; i < viewport.Length; i++)
         {
-            ImageCorners[i] = WorldPoint(viewport[i], tranformMatrix.Value, projectionMatrix.Value);
+            ImageCorners[i] = WorldPoint(viewport[i], transformMatrix.Value, projectionMatrix.Value);
         }
     }
 
     // https://docs.microsoft.com/en-us/windows/mixed-reality/locatable-camera 
     // Video        Preview     Still       Horizontal Field of View(H-FOV)     Suggested usage
     // 1280x720     1280x720    1280x720    45deg                               (default mode)
-    public static Vector3 WorldPoint(Vector2 pixel, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
+    public static Vector3 WorldPoint(Vector2 uv, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
     {
-        Vector3 imagePosProj = (pixel * 2.0f) - Vector2.one; // -1 to 1 space
+        Vector3 imagePosProj = (uv * 2.0f) - Vector2.one; // -1 to 1 space
         Vector3 cameraSpacePos = UnProjectVector(cameraProjection, imagePosProj);
         return cameraTransform.MultiplyVector(cameraSpacePos);
     }
