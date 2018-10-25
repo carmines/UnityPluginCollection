@@ -107,8 +107,6 @@ namespace CameraCapture
 
         private void OnVideoFrame(Wrapper.CaptureState state)
         {
-            Debug.Log("PreviewVideoFrame: " + state);
-
             if (videoTexture == null)
             {
                 videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);

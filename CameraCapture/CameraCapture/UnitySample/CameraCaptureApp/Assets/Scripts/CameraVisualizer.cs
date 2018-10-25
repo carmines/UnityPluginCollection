@@ -5,10 +5,9 @@ public class CameraVisualizer : MonoBehaviour
 {
     public SpatialCameraTracker cameraTracker;
 
-    public LineRenderer nearPlaneRenderer;
-    public LineRenderer farPlaneRenderer;
-    public Transform[] Corners;
-    public Transform Position;
+    public LineRenderer imgbounds;
+    public Transform[] corners;
+    public Transform position;
 
     private void Awake()
     {
@@ -28,64 +27,38 @@ public class CameraVisualizer : MonoBehaviour
 
     private void Update()
     {
-        if (cameraTracker.NearCorners == null || cameraTracker.FarCorners == null)
+        if (cameraTracker.ImageCorners == null)
         {
             return;
         }
 
-        if (nearPlaneRenderer != null && nearPlaneRenderer.positionCount != 4)
+        if (imgbounds != null && imgbounds.positionCount != 4)
         {
-            nearPlaneRenderer.positionCount = 4;
-        }
-
-        if (farPlaneRenderer != null && farPlaneRenderer.positionCount != 4)
-        {
-            farPlaneRenderer.positionCount = 4;
+            imgbounds.positionCount = 4;
         }
 
         // increase nearplane size
         const float scaleAmount = 4f;
-        Bounds nearBounds = new Bounds();
-        Bounds farBounds = new Bounds();
         float smooth = Time.deltaTime * 5f;
-        Vector3 cameraPos = cameraTracker.spatialCamera.transform.position;
+        Vector3 cameraPos = cameraTracker.transform.position;
 
         // update the offset from main camera to spatial camera
-        if (Position != null)
+        if (position != null)
         {
             Vector3 mainPos = Camera.main.transform.position;
             Vector3 mainToSpatialOffset = cameraPos - mainPos;
 
-            Position.localPosition = Vector3.Lerp(Position.localPosition, mainToSpatialOffset, smooth);
+            position.localPosition = Vector3.Lerp(position.localPosition, mainToSpatialOffset, smooth);
         }
 
         // update corner verticies
         for (int i = 0; i < 4; i++)
         {
-            if (nearPlaneRenderer != null)
+            imgbounds.SetPosition(i, position.localPosition + cameraTracker.ImageCorners[i]);
+
+            if (i < corners.Length)
             {
-                // calc relative offset
-                Vector3 offset = (cameraTracker.NearCorners[i] - cameraPos) * scaleAmount;
-                Vector3 currentPos = nearPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, smooth);
-                nearPlaneRenderer.SetPosition(i, newPos);
-
-                if (i < Corners.Length)
-                {
-                    Corners[i].localPosition = newPos;
-                }
-
-                nearBounds.Expand(newPos);
-            }
-
-            if (farPlaneRenderer != null)
-            {
-                Vector3 offset = (cameraTracker.FarCorners[i] - cameraPos);
-                Vector3 currentPos = farPlaneRenderer.GetPosition(i);
-                Vector3 newPos = Vector3.Lerp(currentPos, offset, smooth);
-                farPlaneRenderer.SetPosition(i, newPos);
-
-                farBounds.Expand(newPos);
+                corners[i].position = imgbounds.GetPosition(i);
             }
         }
     }

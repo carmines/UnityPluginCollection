@@ -9,113 +9,8 @@ namespace SpatialTranformHelper
 {
     [Serializable]
     [StructLayout(LayoutKind.Sequential)]
-    public struct Float2 : IEquatable<Float2>
-    {
-        public float X;
-        public float Y;
-
-        public static readonly Float2 Zero = default(Float2);
-
-        public static Float2 FromUnity(UnityEngine.Vector2 vector)
-        {
-            return new Float2
-            {
-                X = vector.x,
-                Y = vector.y
-            };
-        }
-
-        public bool Equals(Float2 other)
-        {
-            return this.X == other.X
-                && this.Y == other.Y;
-        }
-
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is Float2)
-            {
-                return this.Equals((Float2)obj);
-            }
-
-            return false;
-        }
-
-        public static bool operator ==(Float2 a, Float2 b)
-        {
-            return a.Equals(b);
-        }
-
-        public static bool operator !=(Float2 a, Float2 b)
-        {
-            return !a.Equals(b);
-        }
-
-    }
-
-    [Serializable]
-    [StructLayout(LayoutKind.Sequential)]
-    public struct Float3 : IEquatable<Float3>
-    {
-        public float X;
-        public float Y;
-        public float Z;
-
-        public static readonly Float3 Zero = default(Float3);
-
-        public static Float3 FromUnity(UnityEngine.Vector3 vector)
-        {
-            return new Float3
-            {
-                X = vector.x,
-                Y = vector.y,
-                Z = vector.z
-            };
-        }
-
-        public bool Equals(Float3 other)
-        {
-            return this.X == other.X
-                && this.Y == other.Y
-                && this.Z == other.Z;
-        }
-
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (obj is Float3)
-            {
-                return this.Equals((Float3)obj);
-            }
-
-            return false;
-        }
-
-        public static bool operator ==(Float3 a, Float3 b)
-        {
-            return a.Equals(b);
-        }
-
-        public static bool operator !=(Float3 a, Float3 b)
-        {
-            return !a.Equals(b);
-        }
-    }
-
-    [Serializable]
-    [StructLayout(LayoutKind.Sequential)]
     public struct Matrix4x4 : IEquatable<Matrix4x4>
     {
-        // row major
         public float M00;
         public float M01;
         public float M02;
@@ -136,37 +31,24 @@ namespace SpatialTranformHelper
         public static readonly Matrix4x4 Zero = default(Matrix4x4);
 
         public static Matrix4x4 BaseProjectionMatrix = new Matrix4x4()
-        {   // row major
+        {
             M00 = 2.0f, M01 = 0.0f, M02 = 0.0f, M03 = 0.0f,
             M10 = 0.0f, M11 =-2.0f, M12 = 0.0f, M13 = 0.0f,
             M20 =-1.0f, M21 = 1.0f, M22 = 1.0f, M23 = 1.0f,
             M30 = 0.0f, M31 = 0.0f, M32 = 0.0f, M33 = 0.0f
         };
 
-        public static Matrix4x4 FromUnity(UnityEngine.Matrix4x4 unityMatrix)
+        public UnityEngine.Matrix4x4 ToUnity()
         {
-            return new Matrix4x4
-            {   // to row major
-                M00 = unityMatrix.m00,
-                M10 = unityMatrix.m01,
-                M20 = unityMatrix.m02,
-                M30 = unityMatrix.m03,
+            return this.ToUnityMatrix();
+        }
 
-                M01 = unityMatrix.m10,
-                M11 = unityMatrix.m11,
-                M21 = unityMatrix.m12,
-                M31 = unityMatrix.m13,
+        public UnityEngine.Matrix4x4 ToUnityTransform()
+        {
+            var zflip = UnityEngine.Matrix4x4.identity;
+            zflip.SetColumn(2, -1 * zflip.GetColumn(2));
 
-                M02 = unityMatrix.m20,
-                M12 = unityMatrix.m21,
-                M22 = unityMatrix.m22,
-                M32 = unityMatrix.m23,
-
-                M03 = unityMatrix.m30,
-                M13 = unityMatrix.m31,
-                M23 = unityMatrix.m32,
-                M33 = unityMatrix.m33,
-            };
+            return zflip * this.ToUnityMatrix() * zflip;
         }
 
         public bool Equals(Matrix4x4 other)
@@ -217,50 +99,38 @@ namespace SpatialTranformHelper
         }
     }
 
-    public struct CameraPose
-    {
-        public readonly Vector3 Position;
-        public readonly Quaternion Rotation;
-
-        public CameraPose(Vector3 position, Quaternion rotation)
-        {
-            this.Position = position;
-            this.Rotation = rotation;
-        }
-    }
-
     public static class Functions
     {
-        /// <summary>
-        /// Converts the input vector to a Unity vector2
-        /// </summary>
-        public static UnityEngine.Vector2 ToUnity(this Float2 rawVector)
+        public static Matrix4x4 FromUnity(this UnityEngine.Matrix4x4 unityMatrix)
         {
-            return new UnityEngine.Vector2
+            return new Matrix4x4
             {
-                x = rawVector.X,
-                y = rawVector.Y
+                M00 = unityMatrix.m00,
+                M10 = unityMatrix.m01,
+                M20 = unityMatrix.m02,
+                M30 = unityMatrix.m03,
+
+                M01 = unityMatrix.m10,
+                M11 = unityMatrix.m11,
+                M21 = unityMatrix.m12,
+                M31 = unityMatrix.m13,
+
+                M02 = unityMatrix.m20,
+                M12 = unityMatrix.m21,
+                M22 = unityMatrix.m22,
+                M32 = unityMatrix.m23,
+
+                M03 = unityMatrix.m30,
+                M13 = unityMatrix.m31,
+                M23 = unityMatrix.m32,
+                M33 = unityMatrix.m33,
             };
         }
 
         /// <summary>
-        /// Converts the input vector to a Unity vector3
+        /// Converts the spaitial matrix to a Unity matrix
         /// </summary>
-        public static UnityEngine.Vector3 ToUnity(this Float3 rawVector)
-        {
-            return new UnityEngine.Vector3
-            {
-                x = rawVector.X,
-                y = rawVector.Y,
-                z = rawVector.Z
-            };
-        }
-
-
-        /// <summary>
-        /// Converts the input matrix to a Unity matrix and transposes it
-        /// </summary>
-        public static UnityEngine.Matrix4x4 ToUnityRaw(this Matrix4x4 rawMatrix)
+        public static UnityEngine.Matrix4x4 ToUnityMatrix(this Matrix4x4 rawMatrix)
         {
             return new UnityEngine.Matrix4x4
             {   // to column major
@@ -289,98 +159,26 @@ namespace SpatialTranformHelper
         /// <summary>
         /// Converts the input matrix to Unity transform matrix.
         /// </summary>
-        public static UnityEngine.Matrix4x4 ToUnityTransform(this Matrix4x4 inputMatrix)
+        public static UnityEngine.Matrix4x4 ToUnityTransform(this Matrix4x4 rawMatrix)
         {
             var zflip = UnityEngine.Matrix4x4.identity;
             zflip.SetColumn(2, -1 * zflip.GetColumn(2));
 
-            return zflip * inputMatrix.ToUnityRaw() * zflip;
+            return zflip * rawMatrix.ToUnityMatrix() * zflip;
         }
 
         /// <summary>
-        /// Converts Unity matrix to position and rotation values
+        /// Converts the input matrix to Unity transform matrix but can return null
         /// </summary>
-        public static void GetTranslationRotation(this UnityEngine.Matrix4x4 matrix, out Vector3 position, out Quaternion rotation)
+        public static UnityEngine.Matrix4x4? ConvertToUnityMatrix(this Matrix4x4 rawMatrix)
         {
-            position = matrix.Translation();
-            rotation = matrix.Rotation();
-        }
-
-        public static Vector3 Translation(this UnityEngine.Matrix4x4 trsMatrix)
-        {
-            return trsMatrix.GetColumn(3);
-        }
-
-        public static Quaternion Rotation(this UnityEngine.Matrix4x4 trsMatrix)
-        {
-            return Quaternion.LookRotation(trsMatrix.GetColumn(2), trsMatrix.GetColumn(1));
-        }
-
-        public static Vector3 Scale(this UnityEngine.Matrix4x4 trsMatrix)
-        {
-            var scale = new Vector3(
-                trsMatrix.GetColumn(0).magnitude,
-                trsMatrix.GetColumn(1).magnitude,
-                trsMatrix.GetColumn(2).magnitude);
-            return scale;
-        }
-
-        /// <summary>
-        /// Converts the input projection matrix to a Unity matrix and overrides the near and far clip plane.
-        /// </summary>
-        public static UnityEngine.Matrix4x4 ToUnityProjection(this Matrix4x4 inputMatrix, float nearClipPlane, float farClipPlane)
-        {
-            // The following code enforces valid near/far clip plane values
-            float epsilon = 0.01f;
-            if (nearClipPlane < epsilon)
-            {
-                nearClipPlane = epsilon;
-            }
-
-            if (farClipPlane < nearClipPlane + epsilon)
-            {
-                farClipPlane = nearClipPlane + epsilon;
-            }
-
-            var unityMatrix = inputMatrix.ToUnityRaw();
-            unityMatrix.m22 = -(farClipPlane + nearClipPlane) / (farClipPlane - nearClipPlane);
-            unityMatrix.m23 = -(2.0f * farClipPlane * nearClipPlane) / (farClipPlane - nearClipPlane);
-
-            return unityMatrix;
-        }
-
-        public static CameraPose? ConvertWorldViewMatrix(this Matrix4x4 cameraPose)
-        {
-            if (cameraPose == Matrix4x4.Zero)
+            if (rawMatrix == Matrix4x4.Zero)
             {
                 return null;
             }
 
-            Vector3 cameraPosition;
-            Quaternion cameraRotation;
-            cameraPose.ToUnityTransform().GetTranslationRotation(out cameraPosition, out cameraRotation);
-
-            return new CameraPose(cameraPosition, cameraRotation);
+            return rawMatrix.ToUnityMatrix();
         }
 
-        public static UnityEngine.Matrix4x4? ConvertCameraProjectionMatrix(this Matrix4x4 cameraProjection, float nearClipPlane, float farClipPlane)
-        {
-            if (cameraProjection == Matrix4x4.Zero)
-            {
-                return null;
-            }
-
-            return cameraProjection.ToUnityProjection(nearClipPlane, farClipPlane);
-        }
-
-        public static UnityEngine.Matrix4x4? GetUnityMatrix(this Matrix4x4 matrix)
-        {
-            if (matrix == Matrix4x4.Zero)
-            {
-                return null;
-            }
-
-            return matrix.ToUnityRaw();
-        }
     }
 }

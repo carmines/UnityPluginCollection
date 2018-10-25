@@ -1,35 +1,27 @@
-﻿using SpatialTranformHelper;
+﻿using System;
 using UnityEngine;
+
+using Spatial4x4 = SpatialTranformHelper.Matrix4x4;
 
 [RequireComponent(typeof(Camera))]
 public class SpatialCameraTracker : MonoBehaviour
 {
-    public Camera spatialCamera { get; private set; }
+    public Vector3[] ImageCorners { get; private set; }
+    public Vector3 ImageCenter { get; private set; }
 
-    public Vector3[] NearCorners { get; private set; }
+    private Vector2[] viewport = new Vector2[] { new Vector2(0.0f, 0.0f),  new Vector2(0.0f, 1.0f), new Vector2(1.0f, 1.0f), new Vector2(1.0f, 0.0f) };
 
-    public Vector3[] FarCorners { get; private set; }
+    private Spatial4x4 cameraTransform = Spatial4x4.Zero;
+    private Spatial4x4 lastGoodCameraTransform = Spatial4x4.Zero;
 
-    private SpatialTranformHelper.Matrix4x4 cameraTransform;
-    private SpatialTranformHelper.Matrix4x4 lastGoodCameraTransform;
-
-    private SpatialTranformHelper.Matrix4x4 cameraProjection;
-    private SpatialTranformHelper.Matrix4x4 lastGoodCameraProjection;
-
-    private float fov, aspectRatio, nearPlane, farPlane;
-    private UnityEngine.Matrix4x4 defaultCameraProjection;
-
-    private bool wasUpdated = false;
-
-    // frustum points
-    private Plane temp;
-    private Plane[] cameraPlanes = null;
+    private Spatial4x4 cameraProjection = Spatial4x4.Zero;
+    private Spatial4x4 lastGoodCameraProjection = Spatial4x4.Zero;
 
     private void Awake()
     {
         if (transform.parent != null)
         {
-            Debug.LogError("This gameObject should be on the roor of the scene.");
+            Debug.LogError("This gameObject should be on the root of the scene.");
 
             return;
         }
@@ -37,123 +29,91 @@ public class SpatialCameraTracker : MonoBehaviour
 
     private void OnEnable()
     {
-        spatialCamera = GetComponent<Camera>();
-
-        fov = Camera.main.fieldOfView;
-        aspectRatio = Camera.main.aspect;
-        nearPlane = Camera.main.nearClipPlane;
-        farPlane = Camera.main.farClipPlane;
-        defaultCameraProjection =
-            UnityEngine.Matrix4x4.Perspective(fov, aspectRatio, nearPlane, farPlane);
-
-        spatialCamera.stereoTargetEye = StereoTargetEyeMask.None;
-        spatialCamera.clearFlags = CameraClearFlags.SolidColor;
-        spatialCamera.renderingPath = RenderingPath.Forward;
-        spatialCamera.backgroundColor = Color.magenta * 0.25f; // color that is noticeable if not set correctly
-        spatialCamera.allowMSAA = false;
-        spatialCamera.allowHDR = false;
-        spatialCamera.forceIntoRenderTexture = true;
-        spatialCamera.targetTexture = new RenderTexture(1, 1, 0);
-
-        spatialCamera.projectionMatrix = defaultCameraProjection;
-    }
-
-    private void Update()
-    {
-        if (cameraPlanes == null || NearCorners == null || FarCorners == null || !wasUpdated)
-        {
-            return;
-        }
-        wasUpdated = false;
-
-        // get the latest planes
-        GeometryUtility.CalculateFrustumPlanes(spatialCamera, cameraPlanes);
-
-        // re-arrange planes for looping
-        temp = cameraPlanes[1]; cameraPlanes[1] = cameraPlanes[2]; cameraPlanes[2] = temp;
-
-        // update corner verticies
-        for (int i = 0; i < 4; i++)
-        {
-            NearCorners[i] = GetPlaneIntersection(cameraPlanes[4], cameraPlanes[i], cameraPlanes[(i + 1) % 4]);
-            FarCorners[i] = GetPlaneIntersection(cameraPlanes[5], cameraPlanes[i], cameraPlanes[(i + 1) % 4]);
-        }
+        ImageCorners = null;
     }
 
     // store the matrix values, any updates will happen on the update loop
-    public void UpdateCameraMatrices(SpatialTranformHelper.Matrix4x4 transform, SpatialTranformHelper.Matrix4x4 projection)
+    public void UpdateCameraMatrices(Spatial4x4 transform, Spatial4x4 projection)
     {
         // store matrix information from the sample
-        if (cameraTransform != SpatialTranformHelper.Matrix4x4.Zero)
+        if (cameraTransform != Spatial4x4.Zero)
         {
             // always track the last known good transform
             lastGoodCameraTransform = cameraTransform;
         }
         cameraTransform = transform;
 
-        if (cameraProjection != SpatialTranformHelper.Matrix4x4.Zero)
+        if (cameraProjection != Spatial4x4.Zero)
         {
             lastGoodCameraProjection = cameraProjection;
         }
         cameraProjection = projection;
 
-        // update gameobject transform based on the matricies
-        CameraPose? currentCameraPose = cameraTransform.ConvertWorldViewMatrix();
-        if (currentCameraPose == null)
+        // get last known good transform
+        Matrix4x4? tranformMatrix = cameraTransform.ToUnityTransform();
+        if (tranformMatrix == null)
         {
-            currentCameraPose = lastGoodCameraTransform.ConvertWorldViewMatrix();
-        }
-
-        // set the real worl position to the matrix
-        if (currentCameraPose != null)
-        {
-            spatialCamera.transform.position = currentCameraPose.Value.Position;
-            spatialCamera.transform.rotation = currentCameraPose.Value.Rotation;
+            tranformMatrix = lastGoodCameraTransform.ToUnityTransform();
         }
 
         // swap the projection for the one sent to us
-        UnityEngine.Matrix4x4? currentCameraProjection
-            = cameraProjection.ConvertCameraProjectionMatrix(nearPlane, farPlane);
-        if (currentCameraProjection == null)
+        UnityEngine.Matrix4x4? projectionMatrix = null;
+        if (cameraProjection != Spatial4x4.Zero)
         {
-            currentCameraProjection
-                = lastGoodCameraProjection.ConvertCameraProjectionMatrix(nearPlane, farPlane);
+            projectionMatrix = cameraProjection.ToUnity();
+        }
+        else if (lastGoodCameraProjection != Spatial4x4.Zero)
+        {
+            projectionMatrix = cameraProjection.ToUnity();
         }
 
-        if (currentCameraProjection != null)
-        {
-            spatialCamera.projectionMatrix = currentCameraProjection.Value;
-        }
-
-        if (currentCameraPose == null)
+        if (tranformMatrix == null || projectionMatrix == null)
         {
              return;
         }
 
-        if (cameraPlanes == null)
+        // set the real worl position to PV camera pose
+        if (tranformMatrix.Value.ValidTRS())
         {
-            cameraPlanes = new Plane[6];
+            gameObject.transform.position = tranformMatrix.Value.GetColumn(3);
+            gameObject.transform.rotation = Quaternion.LookRotation(tranformMatrix.Value.GetColumn(2), tranformMatrix.Value.GetColumn(1));
         }
 
-        if (NearCorners == null)
+        if (ImageCorners == null)
         {
-            NearCorners = new Vector3[4];
+            ImageCorners = new Vector3[4];
         }
 
-        if (FarCorners == null)
-        {
-            FarCorners = new Vector3[4];
-        }
+        ImageCenter = WorldPoint(new Vector2(.5f, .5f), tranformMatrix.Value, projectionMatrix.Value);
 
-        wasUpdated = true;
+        for (int i = 0; i < viewport.Length; i++)
+        {
+            ImageCorners[i] = WorldPoint(viewport[i], tranformMatrix.Value, projectionMatrix.Value);
+        }
     }
 
-    // get the intersection point of 3 planes
-    private Vector3 GetPlaneIntersection(Plane p1, Plane p2, Plane p3)
+    // https://docs.microsoft.com/en-us/windows/mixed-reality/locatable-camera 
+    // Video        Preview     Still       Horizontal Field of View(H-FOV)     Suggested usage
+    // 1280x720     1280x720    1280x720    45deg                               (default mode)
+    public static Vector3 WorldPoint(Vector2 pixel, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
     {
-        return ((-p1.distance * Vector3.Cross(p2.normal, p3.normal)) +
-                (-p2.distance * Vector3.Cross(p3.normal, p1.normal)) +
-                (-p3.distance * Vector3.Cross(p1.normal, p2.normal))) /
-                (Vector3.Dot(p1.normal, Vector3.Cross(p2.normal, p3.normal)));
+        Vector3 imagePosProj = (pixel * 2.0f) - Vector2.one; // -1 to 1 space
+        Vector3 cameraSpacePos = UnProjectVector(cameraProjection, imagePosProj);
+        return cameraTransform.MultiplyVector(cameraSpacePos);
+    }
+
+    public static Vector3 UnProjectVector(Matrix4x4 projectionMatrix, Vector3 imagePosProjected)
+    {
+        Vector3 from = Vector3.zero;
+
+        var axsX = projectionMatrix.GetRow(0);
+        var axsY = projectionMatrix.GetRow(1);
+        var axsZ = projectionMatrix.GetRow(2);
+
+        from.z = imagePosProjected.z / axsZ.z;
+        from.y = (imagePosProjected.y - (from.z * axsY.z)) / axsY.y;
+        from.x = (imagePosProjected.x - (from.z * axsX.z)) / axsX.x;
+
+        return from;
     }
 }
