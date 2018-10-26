@@ -5,6 +5,7 @@
 #include "Plugin.PdfLoader.h"
 #include "WICTextureLoader.h"
 #include <winrt/windows.storage.streams.h>
+#include <Winrt/Windows.Web.Http.h>
 
 using namespace winrt;
 using namespace PDFLoader::Plugin::implementation;
@@ -207,32 +208,50 @@ IAsyncActionWithProgress<double> PdfLoader::LoadFileAsync(hstring folderName, hs
 
     progress(0.0);
 
-    Windows::Storage::StorageFolder storageFolder = nullptr;
-    try
+    std::wstring_view fileNameView = fileName;
+
+    Windows::Storage::Streams::IRandomAccessStream stream;
+    if (fileNameView.find_last_of(L"http:", 0) == 0 || 
+        fileNameView.find_last_of(L"https:", 0) == 0)
     {
-        storageFolder = Windows::Storage::ApplicationData::Current().LocalFolder();
+        auto uri = Windows::Foundation::Uri(fileName);
+        auto streamReference = RandomAccessStreamReference::CreateFromUri(uri);
+
+        progress(++currentProgress / total);
+
+        stream = co_await streamReference.OpenReadAsync();
+
+        progress(++currentProgress / total);
     }
-    catch (...)
+    else
     {
-        storageFolder = Windows::Storage::KnownFolders::DocumentsLibrary();
+        Windows::Storage::StorageFolder storageFolder = nullptr;
+        try
+        {
+            storageFolder = Windows::Storage::ApplicationData::Current().LocalFolder();
+        }
+        catch (...)
+        {
+            storageFolder = Windows::Storage::KnownFolders::DocumentsLibrary();
+        }
+
+        if (!folderName.empty() && std::wstring(folderName).find(L":\\") != std::wstring::npos)
+        {
+            storageFolder = co_await Windows::Storage::StorageFolder::GetFolderFromPathAsync(folderName);
+        }
+        else if (!folderName.empty())
+        {
+            storageFolder = co_await storageFolder.GetFolderAsync(folderName);
+        }
+
+        progress(++currentProgress / total);
+
+        auto storageFile = co_await storageFolder.GetFileAsync(fileName);
+
+        progress(++currentProgress / total);
+
+        stream = co_await storageFile.OpenAsync(Windows::Storage::FileAccessMode::Read);
     }
-
-    if (!folderName.empty() && std::wstring(folderName).find(L":\\") != std::wstring::npos)
-    {
-        storageFolder = co_await Windows::Storage::StorageFolder::GetFolderFromPathAsync(folderName);
-    }
-    else if (!folderName.empty())
-    {
-        storageFolder = co_await storageFolder.GetFolderAsync(folderName);
-    }
-
-    progress(++currentProgress / total);
-
-    auto storageFile = co_await storageFolder.GetFileAsync(fileName);
-
-    progress(++currentProgress / total);
-
-    auto stream = co_await storageFile.OpenAsync(Windows::Storage::FileAccessMode::Read);
 
     progress(++currentProgress / total);
 
