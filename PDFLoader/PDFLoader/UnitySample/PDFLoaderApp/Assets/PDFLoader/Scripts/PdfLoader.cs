@@ -63,7 +63,10 @@ namespace PDFLoader
 
             CreatePdf();
 
-            LoadPDF(FileName);
+            if (!string.IsNullOrEmpty(FileName))
+            {
+                LoadPDF(FileName);
+            }
         }
 
         protected override void OnDisable()
