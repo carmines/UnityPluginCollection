@@ -23,13 +23,15 @@ using namespace Windows::Media::MediaProperties;
 
 using winrtCaptureEngine = CameraCapture::Plugin::CaptureEngine;
 
+_Use_decl_annotations_
 CameraCapture::Plugin::IModule CaptureEngine::Create(
-    _In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice,
-    _In_ StateChangedCallback fnCallback)
+    std::weak_ptr<IUnityDeviceResource> const& unityDevice,
+    StateChangedCallback fnCallback,
+    void* pCallbackObject)
 {
     auto capture = make<CaptureEngine>();
 
-    if (SUCCEEDED(capture.as<IModulePriv>()->Initialize(unityDevice, fnCallback)))
+    if (SUCCEEDED(capture.as<IModulePriv>()->Initialize(unityDevice, fnCallback, pCallbackObject)))
     {
         return capture;
     }

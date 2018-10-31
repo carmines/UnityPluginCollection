@@ -28,7 +28,8 @@ void Module::OnRenderEvent(
 _Use_decl_annotations_
 HRESULT Module::Initialize(
     std::weak_ptr<IUnityDeviceResource> const& unityDevice,
-    StateChangedCallback stateCallback)
+    StateChangedCallback stateCallback, 
+    void* pCallbackObject)
 {
     auto guard = slim_lock_guard(m_mutex);
 
@@ -40,6 +41,7 @@ HRESULT Module::Initialize(
         com_ptr<ID3D11DeviceResource> spD3D11Resources = nullptr;
         IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
 
+        m_pClientObject = pCallbackObject;
         m_stateCallbacks = stateCallback;
         m_deviceResources = unityDevice;
     }
@@ -55,7 +57,7 @@ HRESULT Module::Callback(
 
     NULL_CHK_HR(m_stateCallbacks, S_OK);
 
-    m_stateCallbacks(state);
+    m_stateCallbacks(m_pClientObject, state);
 
     return S_OK;
 }
@@ -85,8 +87,9 @@ HRESULT Module::Failed()
     auto guard = slim_lock_guard(m_mutex);
 
     NULL_CHK_HR(m_stateCallbacks, E_NOT_VALID_STATE);
+    NULL_CHK_HR(m_pClientObject, E_NOT_VALID_STATE);
 
-    m_stateCallbacks(state);
+    m_stateCallbacks(m_pClientObject, state);
 
     return state.value.failedState.hresult;
 }

@@ -10,6 +10,7 @@ using UnityEngine;
 
 namespace CameraCapture
 {
+
     internal static class Wrapper
     {
         internal const string ModuleName = "CameraCapture";
@@ -80,7 +81,7 @@ namespace CameraCapture
         };
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-        internal delegate void StateChangedCallback(CallbackState args);
+        internal delegate void StateChangedCallback(IntPtr senderPtr, CallbackState args);
 
         [DllImport(ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "GetRenderEventFunc")]
         internal static extern IntPtr GetRenderEventFunc();
@@ -89,15 +90,57 @@ namespace CameraCapture
         internal static extern void ReleaseInstance(Int32 instanceId);
 
         [DllImport(ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "CreateCapture")]
-        internal static extern Int32 CreateCapture([MarshalAs(UnmanagedType.FunctionPtr)]Wrapper.StateChangedCallback callback, out Int32 instanceId);
+        internal static extern Int32 CreateCapture([MarshalAs(UnmanagedType.FunctionPtr)]Wrapper.StateChangedCallback callback, IntPtr objectPtr, out Int32 instanceId);
+    }
+
+    internal static class CallbackWrapper
+    {
+        [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
+        internal static void Capture_Callback(IntPtr senderPtr, Wrapper.CallbackState args)
+        {
+            if (senderPtr == IntPtr.Zero)
+            {
+                Debug.LogError("Plugin_Callback: requires thisObjectPtr.");
+
+                return;
+            }
+
+            GCHandle handle = GCHandle.FromIntPtr(senderPtr);
+
+            var thisObject = handle.Target as CameraCapture;
+            if (thisObject == null)
+            {
+                Debug.LogError("Plugin_Callback: thisObjectPtr is not null, but seems invalid.");
+
+                return;
+            }
+
+#if UNITY_WSA_10_0
+            if (!UnityEngine.WSA.Application.RunningOnAppThread())
+            {
+                UnityEngine.WSA.Application.InvokeOnAppThread(() =>
+                {
+                    thisObject.OnStateChanged(args);
+                }, false);
+            }
+            else
+            {
+                thisObject.OnStateChanged(args);
+            }
+#else
+            // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
+            // this will process the callback on AppThread on a FixedUpdate
+            thisObject.OnStateChanged(args);
+#endif
+        }
     }
 
     internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
     {
-
         protected void CreateCapture()
         {
-            CheckHR(Wrapper.CreateCapture(stateChangedCallback, out instanceId));
+            IntPtr thisObjectPtr = GCHandle.ToIntPtr(thisObject);
+            CheckHR(Wrapper.CreateCapture(stateChangedCallback, thisObjectPtr, out instanceId));
         }
 
         protected abstract void OnCallback(Wrapper.CallbackType type, Wrapper.CallbackState args);
@@ -107,8 +150,8 @@ namespace CameraCapture
         protected UInt16 currentFrameIndex = 0;
 
         private IntPtr renderFuncPtr = IntPtr.Zero;
+        private GCHandle thisObject = default(GCHandle);
         private Wrapper.StateChangedCallback stateChangedCallback = null;
-        private GCHandle callbackHandle = default(GCHandle);
 
         // async queue
         private IEnumerator coroutine = null;
@@ -118,55 +161,25 @@ namespace CameraCapture
         private readonly List<Action> callbacks = new List<Action>();
         private readonly List<Action> callbacksToProcess = new List<Action>();
 
-        protected void QueueCallback(Action action)
-        {
-            if (action == null)
-            {
-                return;
-            }
-
-            lock (eventLock)
-            {
-                callbacks.Add(action);
-            }
-        }
-
         protected virtual void Awake()
         {
-            // pin callback
-            stateChangedCallback = (args) =>
-            {
-#if UNITY_WSA_10_0
-                if (!UnityEngine.WSA.Application.RunningOnAppThread())
-                {
-                    UnityEngine.WSA.Application.InvokeOnAppThread(() =>
-                    {
-                        QueueCallback(() => { OnStateChanged(args); });
-                    }, false);
-                }
-                else
-                {
-                    QueueCallback(() => { OnStateChanged(args); });
-                }
-#else
-                // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
-                // this will process the callback on AppThread on a FixedUpdate
-                QueueCallback(() => { OnStateChanged(args); });
-#endif
-            };
+            // define callback function
+            stateChangedCallback = new Wrapper.StateChangedCallback(CallbackWrapper.Capture_Callback);
+
+            // pin this object in the GC
+            thisObject = GCHandle.Alloc(this, GCHandleType.Normal);
 
             renderFuncPtr = Wrapper.GetRenderEventFunc();
-            callbackHandle = GCHandle.Alloc(stateChangedCallback);
         }
 
         protected virtual void OnDestroy()
         {
             renderFuncPtr = IntPtr.Zero;
 
-            if (callbackHandle.IsAllocated)
+            if (thisObject.IsAllocated)
             {
-                callbackHandle.Free();
-                callbackHandle = default(GCHandle);
+                thisObject.Free();
+                thisObject = default(GCHandle);
             }
         }
 
@@ -228,6 +241,55 @@ namespace CameraCapture
             yield return null;
         }
 
+        private void OnFailed(Wrapper.FailedState args)
+        {
+            // failed could be called on a non-ui thread, see OnUpdate
+            // TODO: queue up special actions that can be processed on the next Update pass
+            Debug.LogError(args);
+        }
+
+        internal static Int32 CheckHR(Int32 hresult)
+        {
+            if (hresult != 0)
+            {
+                Debug.LogError("Failed: HRESULT = 0x" + hresult.ToString("X", System.Globalization.NumberFormatInfo.InvariantInfo));
+            }
+
+            return hresult;
+        }
+
+
+        internal void OnStateChanged(Wrapper.CallbackState args)
+        {
+            // TODO: validate callback is on the right thread
+            // if not queue callback action(QueueCallback(() => { OnStateChanged(args); });)
+            QueueCallback(() =>
+            {
+                switch (args.Type)
+                {
+                    case Wrapper.CallbackType.Failed:
+                        OnFailed(args.FailState);
+                        break;
+                    default:
+                        OnCallback(args.Type, args);
+                        break;
+                }
+            });
+        }
+
+        internal void QueueCallback(Action action)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            lock (eventLock)
+            {
+                callbacks.Add(action);
+            }
+        }
+
         protected IEnumerator ProcessCallbacks(YieldInstruction yieldInstruction)
         {
             while (callbacksCoroutine != null)
@@ -266,36 +328,6 @@ namespace CameraCapture
             }
 
             yield return null;
-        }
-
-        private void OnStateChanged(Wrapper.CallbackState args)
-        {
-            switch (args.Type)
-            {
-                case Wrapper.CallbackType.Failed:
-                    OnFailed(args.FailState);
-                    break;
-                default:
-                    OnCallback(args.Type, args);
-                    break;
-            }
-        }
-
-        private void OnFailed(Wrapper.FailedState args)
-        {
-            // failed could be called on a non-ui thread, see OnUpdate
-            // TODO: queue up special actions that can be processed on the next Update pass
-            Debug.LogError(args);
-        }
-
-        internal static Int32 CheckHR(Int32 hresult)
-        {
-            if (hresult != 0)
-            {
-                Debug.LogError("Failed: HRESULT = 0x" + hresult.ToString("X", System.Globalization.NumberFormatInfo.InvariantInfo));
-            }
-
-            return hresult;
         }
     }
 }

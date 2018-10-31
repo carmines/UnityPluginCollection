@@ -19,7 +19,8 @@ namespace winrt::CameraCapture::Plugin::implementation
     {
         static Plugin::IModule Create(
             _In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice,
-            _In_ StateChangedCallback fnCallback);
+            _In_ StateChangedCallback fnCallback,
+            _In_ void* pCallbackObject);
 
         CaptureEngine();
 

@@ -169,9 +169,14 @@ extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ReleaseInstance(
 // Capture
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CreateCapture(
     _In_ StateChangedCallback fnCallback,
+    _In_ void* managedObject,
     _Out_ INSTANCE_HANDLE* handleId)
 {
-    winrt::IModule module = impl::CaptureEngine::Create(s_deviceResource, fnCallback);
+    if (managedObject == nullptr)
+    {
+        return E_INVALIDARG;
+    }
+    winrt::IModule module = impl::CaptureEngine::Create(s_deviceResource, fnCallback, managedObject);
 
     return TrackModule(module, handleId);
 }

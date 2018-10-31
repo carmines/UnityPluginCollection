@@ -104,4 +104,4 @@ typedef struct _CALLBACK_STATE
 } CALLBACK_STATE;
 #pragma pack(pop)
 
-extern "C" typedef void(__stdcall *StateChangedCallback)(_In_ CALLBACK_STATE args);
+extern "C" typedef void(__stdcall *StateChangedCallback)(_In_ void* callbackObject, _In_ CALLBACK_STATE args);
