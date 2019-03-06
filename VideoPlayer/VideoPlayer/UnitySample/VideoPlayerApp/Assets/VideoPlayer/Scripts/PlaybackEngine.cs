@@ -6,6 +6,48 @@ using UnityEngine;
 
 namespace VideoPlayer
 {
+    internal static class PlaybackEngineStateCallback
+    {
+        [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
+        internal static void StateChangedCallback(IntPtr targetObj, Wrapper.CallbackState args)
+        {
+            if (targetObj == IntPtr.Zero)
+            {
+                Debug.LogError("StateChangedCallback: targetObj is null.");
+
+                return;
+            }
+
+            GCHandle gcHandle = GCHandle.FromIntPtr(targetObj);
+
+            var thisObject = gcHandle.Target as PlaybackEngine;
+            if (thisObject == null)
+            {
+                Debug.LogError("StateChangedCallback: targetObj is not null, but not of type PlaybackEngine");
+
+                return;
+            }
+
+#if UNITY_WSA_10_0
+            if (!UnityEngine.WSA.Application.RunningOnAppThread())
+            {
+                UnityEngine.WSA.Application.InvokeOnAppThread(() =>
+                {
+                    thisObject.OnStateChanged(args);
+                }, false);
+            }
+            else
+            {
+                thisObject.OnStateChanged(args);
+            }
+#else
+            // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
+            // this will process the callback on AppThread on a FixedUpdate
+            thisObject.OnStateChanged(args);
+#endif
+        }
+    }
+
     internal class PlaybackEngine : BasePlugin<PlaybackEngine>
     {
         public Renderer playbackRenderer;
@@ -47,7 +89,7 @@ namespace VideoPlayer
         {
             base.OnEnable();
 
-            CreateMediaPlayer();
+            CreateMediaPlayer(new Wrapper.StateChangedCallback(PlaybackEngineStateCallback.StateChangedCallback));
 
             // create native texture for playback
             IntPtr nativeTexture = IntPtr.Zero;

@@ -20,14 +20,7 @@ namespace VideoPlayer
         {
             None = 0,
             Failed,
-            Mesh,
             MediaPlayer,
-        };
-
-        internal enum MeshStateType : Int32
-        {
-            Created = 0,
-            Updated,
         };
 
         internal enum MediaPlayerState : Int32
@@ -53,17 +46,6 @@ namespace VideoPlayer
                 return sb.ToString();
             }
         };
-
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct MeshState
-        {
-            public MeshStateType Type;
-            public UInt32 Frame;
-            public Int32 VertexCount;
-            public Int32 IndexCount;
-            public Vector4 MinPoint;
-            public Vector4 MaxPoint;
-        }
 
         [StructLayout(LayoutKind.Sequential)]
         internal struct PlaybackState
@@ -96,9 +78,6 @@ namespace VideoPlayer
             public FailedState FailState;
 
             [FieldOffset(4)]
-            public MeshState MeshSate;
-
-            [FieldOffset(4)]
             public PlaybackState PlaybackState;
         };
 
@@ -111,60 +90,18 @@ namespace VideoPlayer
         [DllImport(ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "ReleaseInstance")]
         internal static extern void ReleaseInstance(Int32 instanceId);
 
-        [DllImport(ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "CreateMesh")]
-        internal static extern Int32 CreateMesh([MarshalAs(UnmanagedType.FunctionPtr)]Wrapper.StateChangedCallback callback, IntPtr objectPtr, out Int32 instanceId);
-
         [DllImport(ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "MediaPlayerCreatePlayer")]
         internal static extern Int32 CreateMediaPlayer([MarshalAs(UnmanagedType.FunctionPtr)]StateChangedCallback callback, IntPtr objectPtr, out Int32 instanceId);
-    }
-
-    internal static class CallbackWrapper
-    {
-        [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
-        internal static void Capture_Callback(IntPtr senderPtr, Wrapper.CallbackState args)
-        {
-            if (senderPtr == IntPtr.Zero)
-            {
-                Debug.LogError("Plugin_Callback: requires thisObjectPtr.");
-
-                return;
-            }
-
-            GCHandle handle = GCHandle.FromIntPtr(senderPtr);
-
-            var thisObject = handle.Target as PlaybackEngine;
-            if (thisObject == null)
-            {
-                Debug.LogError("Plugin_Callback: thisObjectPtr is not null, but seems invalid.");
-
-                return;
-            }
-
-#if UNITY_WSA_10_0
-            if (!UnityEngine.WSA.Application.RunningOnAppThread())
-            {
-                UnityEngine.WSA.Application.InvokeOnAppThread(() =>
-                {
-                    thisObject.OnStateChanged(args);
-                }, false);
-            }
-            else
-            {
-                thisObject.OnStateChanged(args);
-            }
-#else
-            // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
-            // this will process the callback on AppThread on a FixedUpdate
-            thisObject.OnStateChanged(args);
-#endif
-        }
     }
 
     internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
     {
 
-        protected void CreateMediaPlayer()
+        protected void CreateMediaPlayer(Wrapper.StateChangedCallback callback)
         {
+            // define callback function
+            stateChangedCallback = callback;
+
             IntPtr thisObjectPtr = GCHandle.ToIntPtr(thisObject);
 
             CheckHR(Wrapper.CreateMediaPlayer(stateChangedCallback, thisObjectPtr, out instanceId));
@@ -190,9 +127,6 @@ namespace VideoPlayer
 
         protected virtual void Awake()
         {
-            // define callback function
-            stateChangedCallback = new Wrapper.StateChangedCallback(CallbackWrapper.Capture_Callback);
-
             // pin this object in the GC
             thisObject = GCHandle.Alloc(this, GCHandleType.Normal);
 

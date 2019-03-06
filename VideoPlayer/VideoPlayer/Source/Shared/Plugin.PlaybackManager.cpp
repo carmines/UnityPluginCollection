@@ -280,6 +280,11 @@ HRESULT PlaybackManager::CreateMediaPlayer()
         ZeroMemory(&state.value.playbackState, sizeof(PLAYBACK_STATE));
         state.value.playbackState.state = static_cast<MediaPlayerState>(m_mediaPlaybackSession.PlaybackState());
 
+        state.value.playbackState.width = static_cast<int32_t>(m_mediaPlaybackSession.NaturalVideoWidth());
+        state.value.playbackState.height = static_cast<int32_t>(m_mediaPlaybackSession.NaturalVideoHeight());
+        state.value.playbackState.canSeek = static_cast<boolean>(m_mediaPlaybackSession.CanSeek());
+        state.value.playbackState.duration = m_mediaPlaybackSession.NaturalDuration().count();
+
         Callback(state);
     });
 
