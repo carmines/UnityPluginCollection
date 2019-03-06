@@ -13,11 +13,12 @@ using winrtPlaybackManager = VideoPlayer::Plugin::PlaybackManager;
 
 VideoPlayer::Plugin::IModule PlaybackManager::Create(
     _In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice,
-    _In_ StateChangedCallback fnCallback)
+    _In_ StateChangedCallback fnCallback,
+    void* pCallbackObject)
 {
     auto player = make<PlaybackManager>();
 
-    if (SUCCEEDED(player.as<IModulePriv>()->Initialize(unityDevice, fnCallback)))
+    if (SUCCEEDED(player.as<IModulePriv>()->Initialize(unityDevice, fnCallback, pCallbackObject)))
     {
         return player;
     }

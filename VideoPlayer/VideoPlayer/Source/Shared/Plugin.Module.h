@@ -8,7 +8,7 @@
 
 struct __declspec(uuid("34fe2ecf-68d3-4732-a05a-2a737b63c386")) IModulePriv : ::IUnknown
 {
-    STDMETHOD(Initialize)(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback) PURE;
+    STDMETHOD(Initialize)(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback, _In_ void* pCallbackObject) PURE;
     STDMETHOD(Callback)(_In_ CALLBACK_STATE state) PURE;
 };
 
@@ -22,7 +22,7 @@ namespace winrt::VideoPlayer::Plugin::implementation
         virtual void OnRenderEvent(uint16_t frameNumber);
 
         // IModulePriv
-        STDOVERRIDEMETHODIMP Initialize(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback);
+        STDOVERRIDEMETHODIMP Initialize(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback, _In_ void* pCallbackObject);
         STDOVERRIDEMETHODIMP Callback(_In_ CALLBACK_STATE state);
 
     protected:
@@ -30,6 +30,7 @@ namespace winrt::VideoPlayer::Plugin::implementation
 
     private:
         slim_mutex m_mutex;
+        void* m_pClientObject;
         StateChangedCallback m_stateCallbacks;
     };
 }
