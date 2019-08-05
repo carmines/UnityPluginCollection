@@ -1,4 +1,4 @@
-The UnitySample has .meta files for each plugin the solution will build. Be sure to build x86 and x64 before opening the Unity sample. Your final build should target Release configuration.
+The UnitySample has .meta files for each plugin the solution will build. Be sure to build x86, x64, ARM, and ARM64 before opening the Unity sample. Your final build should target Release configuration.
 
 As well, binaries will be compiled to the solution's Build directory. The binaries are for Desktop/Win32(Unity Editor/Standalone) and Windows 10 Universal(UWP) apps. 
 
