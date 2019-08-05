@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/Payload.g.h"
+#include "Media.Capture.Payload.g.h"
 
 #include <mfidl.h>
 #include <winrt/windows.media.mediaproperties.h>

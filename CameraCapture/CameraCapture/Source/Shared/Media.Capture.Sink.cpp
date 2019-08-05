@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "Media.Capture.Sink.h"
+#include "Media.Capture.Sink.g.cpp"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
@@ -52,7 +53,7 @@ HRESULT Sink::GetCharacteristics(
 {
     Log(L"Sink::GetCharacteristics()\n");
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -74,7 +75,7 @@ HRESULT Sink::AddStreamSink(
 
     *ppStreamSink = nullptr;
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -112,7 +113,7 @@ HRESULT Sink::RemoveStreamSink(
 {
     Log(L"Sink::RemoveStreamSink()\n");
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -162,7 +163,7 @@ HRESULT Sink::GetStreamSinkCount(
 
     NULL_CHK_HR(pdwStreamSinkCount, E_POINTER);
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -182,7 +183,7 @@ HRESULT Sink::GetStreamSinkByIndex(
 
     *ppStreamSink = nullptr;
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -210,7 +211,7 @@ HRESULT Sink::GetStreamSinkById(
 
     *ppStreamSink = nullptr;
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -245,7 +246,7 @@ HRESULT Sink::SetPresentationClock(
 
     NULL_CHK_HR(pPresentationClock, E_INVALIDARG);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -272,7 +273,7 @@ HRESULT Sink::GetPresentationClock(
 
     *ppPresentationClock = nullptr;
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -289,7 +290,7 @@ HRESULT Sink::Shutdown()
 {
     Log(L"Sink::Shutdown()\n");
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     Reset();
 
@@ -305,7 +306,7 @@ HRESULT Sink::OnClockStart(
 {
     Log(L"Sink::OnClockStart()\n");
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -327,7 +328,7 @@ HRESULT Sink::OnClockStop(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -349,7 +350,7 @@ HRESULT Sink::OnClockPause(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -371,7 +372,7 @@ HRESULT Sink::OnClockRestart(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -395,7 +396,7 @@ HRESULT Sink::OnClockSetRate(
     UNREFERENCED_PARAMETER(hnsSystemTime);
     UNREFERENCED_PARAMETER(flRate);
 
-    //slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     //IFR(CheckShutdown());
 
@@ -410,7 +411,7 @@ HRESULT Sink::OnEndOfStream()
     winrt::com_ptr<IMFPresentationClock> spPresentationClock = nullptr;
 
     {
-        slim_shared_lock_guard guard(m_lock);
+		std::shared_lock<slim_mutex> slock(m_mutex);
 
         bool initiateshutdown = true;
         for (auto&& streamSink : m_streamSinks)

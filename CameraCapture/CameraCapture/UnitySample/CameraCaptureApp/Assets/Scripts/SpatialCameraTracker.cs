@@ -97,7 +97,9 @@ public class SpatialCameraTracker : MonoBehaviour
 
     // https://docs.microsoft.com/en-us/windows/mixed-reality/locatable-camera 
     // Video        Preview     Still       Horizontal Field of View(H-FOV)     Suggested usage
-    // 1280x720     1280x720    1280x720    45deg                               (default mode)
+    // V1:1280x720  1280x720    1280x720    45deg                               (default mode)
+    // V2:2272x1278 2272x1278   3904x2196   64.69                               (legacy)
+
     public static Vector3 WorldPoint(Vector2 uv, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
     {
         Vector3 imagePosProj = (uv * 2.0f) - Vector2.one; // -1 to 1 space

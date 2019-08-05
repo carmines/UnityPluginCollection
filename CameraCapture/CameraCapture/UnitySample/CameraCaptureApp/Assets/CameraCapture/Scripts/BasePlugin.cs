@@ -10,7 +10,6 @@ using UnityEngine;
 
 namespace CameraCapture
 {
-
     internal static class Wrapper
     {
         internal const string ModuleName = "CameraCapture";
@@ -93,65 +92,27 @@ namespace CameraCapture
         internal static extern Int32 CreateCapture([MarshalAs(UnmanagedType.FunctionPtr)]Wrapper.StateChangedCallback callback, IntPtr objectPtr, out Int32 instanceId);
     }
 
-    internal static class CallbackWrapper
-    {
-        [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
-        internal static void Capture_Callback(IntPtr senderPtr, Wrapper.CallbackState args)
-        {
-            if (senderPtr == IntPtr.Zero)
-            {
-                Debug.LogError("Plugin_Callback: requires thisObjectPtr.");
-
-                return;
-            }
-
-            GCHandle handle = GCHandle.FromIntPtr(senderPtr);
-
-            var thisObject = handle.Target as CameraCapture;
-            if (thisObject == null)
-            {
-                Debug.LogError("Plugin_Callback: thisObjectPtr is not null, but seems invalid.");
-
-                return;
-            }
-
-#if UNITY_WSA_10_0
-            if (!UnityEngine.WSA.Application.RunningOnAppThread())
-            {
-                UnityEngine.WSA.Application.InvokeOnAppThread(() =>
-                {
-                    thisObject.OnStateChanged(args);
-                }, false);
-            }
-            else
-            {
-                thisObject.OnStateChanged(args);
-            }
-#else
-            // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
-            // this will process the callback on AppThread on a FixedUpdate
-            thisObject.OnStateChanged(args);
-#endif
-        }
-    }
-
     internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
     {
-        protected void CreateCapture()
-        {
-            IntPtr thisObjectPtr = GCHandle.ToIntPtr(thisObject);
-            CheckHR(Wrapper.CreateCapture(stateChangedCallback, thisObjectPtr, out instanceId));
-        }
-
+        // callback handler for derived class
         protected abstract void OnCallback(Wrapper.CallbackType type, Wrapper.CallbackState args);
 
+        // instance returned from plugin
         protected Int32 instanceId = Wrapper.InvalidHandle;
 
+        // current frame index
         protected UInt16 currentFrameIndex = 0;
 
+        // delegate function used for callback, uses CallbackWrapper static method
+        protected Wrapper.StateChangedCallback stateChangedCallback
+            // = new Wrapper.StateChangedCallback(CallbackWrapper<T>.OnCallback);
+            = new Wrapper.StateChangedCallback(CallbackWrapper.OnCallback);
+
+        // pin GC memory location for the object
+        protected GCHandle thisObject = default(GCHandle);
+
+        // pointer of the render function in plugin
         private IntPtr renderFuncPtr = IntPtr.Zero;
-        private GCHandle thisObject = default(GCHandle);
-        private Wrapper.StateChangedCallback stateChangedCallback = null;
 
         // async queue
         private IEnumerator coroutine = null;
@@ -163,9 +124,6 @@ namespace CameraCapture
 
         protected virtual void Awake()
         {
-            // define callback function
-            stateChangedCallback = new Wrapper.StateChangedCallback(CallbackWrapper.Capture_Callback);
-
             // pin this object in the GC
             thisObject = GCHandle.Alloc(this, GCHandleType.Normal);
 

@@ -5,7 +5,7 @@
 
 #include "Unity/IUnityGraphics.h"
 
-struct __declspec(uuid("caa2c8ec-a90c-472e-929a-eb6da0d36d24")) IUnityDeviceResource : ::IUnknown
+struct IUnityDeviceResource
 {
     virtual void __stdcall ProcessDeviceEvent(_In_ UnityGfxDeviceEventType type, _In_ IUnityInterfaces* interfaces) = 0;
     virtual bool __stdcall GetUsesReverseZ() = 0;

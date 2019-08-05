@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "Media.Capture.StreamSink.h"
+#include "Media.Capture.StreamSink.g.cpp"
 #include "Media.Capture.AudioPayload.h"
 #include "Media.Capture.VideoPayload.h"
 
@@ -55,7 +56,7 @@ HRESULT StreamSink::GetMediaSink(
 {
     Log(L"StreamSink::GetMediaSink().\n");
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     m_parentSink.as<IMFMediaSink>().copy_to(ppMediaSink);
 
@@ -66,7 +67,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetIdentifier(
     DWORD *pdwIdentifier)
 {
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     *pdwIdentifier = m_streamIndex;
 
@@ -79,7 +80,7 @@ HRESULT StreamSink::GetMediaTypeHandler(
 {
     Log(L"StreamSink::GetMediaTypeHandler().\n");
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     NULL_CHK_HR(m_parentSink, MF_E_NOT_INITIALIZED);
 
@@ -94,7 +95,7 @@ HRESULT StreamSink::Flush()
 {
     Log(L"StreamSink::Flush().\n");
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     //auto payloadProcessor = m_parentMediaSink.as<MixedRemoteViewCompositor::Media::NetworkMediaSink>().PayloadProcessor();
     //if (payloadProcessor != nullptr)
@@ -133,7 +134,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::ProcessSample(
     IMFSample *pSample)
 {
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -207,7 +208,7 @@ HRESULT StreamSink::PlaceMarker(
 {
     UNREFERENCED_PARAMETER(pvarMarkerValue);
 
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -275,7 +276,7 @@ HRESULT StreamSink::BeginGetEvent(
     IMFAsyncCallback *pCallback,
     ::IUnknown *punkState)
 {
-    slim_shared_lock_guard const guard(m_eventLock);
+	std::shared_lock<slim_mutex> slk(m_eventMutex);
 
     return m_eventQueue->BeginGetEvent(pCallback, punkState);
 }
@@ -285,7 +286,7 @@ HRESULT StreamSink::EndGetEvent(
     IMFAsyncResult *pResult,
     IMFMediaEvent **ppEvent)
 {
-    slim_shared_lock_guard const guard(m_eventLock);
+	std::shared_lock<slim_mutex> slk(m_eventMutex);
 
     return m_eventQueue->EndGetEvent(pResult, ppEvent);
 }
@@ -295,7 +296,7 @@ HRESULT StreamSink::GetEvent(
     DWORD dwFlags,
     IMFMediaEvent **ppEvent)
 {
-    slim_shared_lock_guard const guard(m_eventLock);
+	std::shared_lock<slim_mutex> slk(m_eventMutex);
 
     return m_eventQueue->GetEvent(dwFlags, ppEvent);
 }
@@ -307,7 +308,7 @@ HRESULT StreamSink::QueueEvent(
     HRESULT hrStatus,
     const PROPVARIANT *pvValue)
 {
-    slim_shared_lock_guard const guard(m_eventLock);
+	std::shared_lock<slim_mutex> slk(m_eventMutex);
 
     return m_eventQueue->QueueEventParamVar(met, guidExtendedType, hrStatus, pvValue);
 }
@@ -318,7 +319,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetCurrentMediaType(
     IMFMediaType **ppMediaType)
 {
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     m_mediaType.copy_to(ppMediaType);
 
@@ -329,7 +330,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetMajorType(
     GUID *pguidMajorType)
 {
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     *pguidMajorType = m_guidMajorType;
 
@@ -341,7 +342,7 @@ HRESULT StreamSink::GetMediaTypeByIndex(
     DWORD dwIndex,
     IMFMediaType **ppType)
 {
-    slim_shared_lock_guard const guard(m_lock);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     // support only one mediatype
     if (dwIndex > 0)
@@ -384,7 +385,7 @@ HRESULT StreamSink::SetCurrentMediaType(
 {
     NULL_CHK_HR(pMediaType, E_INVALIDARG);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     if (m_mediaType != nullptr)
     {
@@ -418,7 +419,7 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
 {
     UNREFERENCED_PARAMETER(systemTime);
 
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -436,7 +437,7 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
 _Use_decl_annotations_
 HRESULT StreamSink::Stop()
 {
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     IFR(CheckShutdown());
 
@@ -450,7 +451,7 @@ HRESULT StreamSink::Stop()
 _Use_decl_annotations_
 HRESULT StreamSink::Shutdown()
 {
-    slim_lock_guard guard(m_lock);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     if (m_currentState == State::Shutdown)
     {

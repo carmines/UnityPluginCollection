@@ -134,7 +134,7 @@ IAsyncOperation<DeviceInformation> GetFirstDeviceAsync(
 
     // get collection for device class
     auto devices = co_await DeviceInformation::FindAllAsync(deviceClass);
-    for (auto&& device : devices)
+    for (auto const& device : devices)
     {
         Log(L"Name: %s, Id: %s\n", device.Name().c_str(), device.Id().c_str());
         if (deviceInfo == nullptr)
@@ -212,7 +212,7 @@ HRESULT GetSurfaceFromTexture(
 
     IFR(spInspectable->QueryInterface(
         guid_of<IDirect3DSurface>(),
-        reinterpret_cast<void**>(put_abi(direct3dSurface))));
+        put_abi(direct3dSurface)));
 
     return S_OK;
 }

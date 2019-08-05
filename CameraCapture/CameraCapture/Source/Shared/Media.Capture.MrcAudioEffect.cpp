@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "Media.Capture.MrcAudioEffect.h"
+#include "Media.Capture.MrcAudioEffect.g.cpp"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;

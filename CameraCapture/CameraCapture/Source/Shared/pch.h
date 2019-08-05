@@ -3,11 +3,16 @@
 
 #pragma once
 
+#include <memory>
+#include <shared_mutex>
+
 #define WIN32_LEAN_AND_MEAN
 
 // cppwrint
+#include <unknwn.h>
 #include <winrt/base.h>
 #include <winrt/windows.foundation.h>
+#include <winrt/windows.foundation.collections.h>
 
 #include <windows.h>
 #include <strsafe.h>

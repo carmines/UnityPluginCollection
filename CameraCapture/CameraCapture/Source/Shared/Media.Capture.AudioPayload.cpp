@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "Media.Capture.AudioPayload.h"
+#include "Media.Capture.AudioPayload.g.cpp"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;

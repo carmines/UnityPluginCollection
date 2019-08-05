@@ -99,7 +99,7 @@ namespace SpatialTranformHelper
         }
     }
 
-    public static class Functions
+    public static class Matrix4x4Extensions
     {
         public static Matrix4x4 FromUnity(this UnityEngine.Matrix4x4 unityMatrix)
         {

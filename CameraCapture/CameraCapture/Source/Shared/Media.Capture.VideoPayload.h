@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/VideoPayload.g.h"
+#include "Media.Capture.VideoPayload.g.h"
 #include "Media.Capture.Payload.h"
 
 namespace winrt::CameraCapture::Media::Capture::implementation

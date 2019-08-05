@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Plugin/CaptureEngine.g.h"
+#include "Plugin.CaptureEngine.g.h"
 #include "Plugin.Module.h"
 #include "Media.Capture.Sink.h"
 #include "Media.Capture.PayloadHandler.h"

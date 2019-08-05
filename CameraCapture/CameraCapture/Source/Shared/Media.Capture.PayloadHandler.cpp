@@ -3,11 +3,10 @@
 
 #include "pch.h"
 #include "Media.Capture.PayloadHandler.h"
+#include "Media.Capture.PayloadHandler.g.cpp"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
-
-using winrtPayload = CameraCapture::Media::Capture::Payload;
 
 PayloadHandler::PayloadHandler()
     : m_isShutdown(false)
@@ -18,11 +17,11 @@ PayloadHandler::PayloadHandler()
 
 _Use_decl_annotations_
 HRESULT PayloadHandler::QueuePayload(
-    winrtPayload const& payload)
+	CameraCapture::Media::Capture::Payload const& payload)
 {
     NULL_CHK_HR(payload, S_OK);
 
-    slim_shared_lock_guard const guard(m_mutex);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     if (m_isShutdown)
     {
@@ -45,7 +44,7 @@ HRESULT PayloadHandler::GetParameters(
     DWORD *pdwFlags,
     DWORD *pdwQueue)
 {
-    slim_shared_lock_guard const guard(m_mutex);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     if (m_isShutdown)
     {
@@ -68,12 +67,14 @@ HRESULT PayloadHandler::Invoke(
 
     NULL_CHK_HR(spState, E_POINTER);
 
-    auto payload = spState.as<winrtPayload>();
+    auto payload = spState.as<CameraCapture::Media::Capture::Payload>();
 
     HRESULT hr = S_OK;
     
     if (m_sampleEvent)
     {
+		std::shared_lock<slim_mutex> slock(m_mutex);
+
         m_sampleEvent(*this, payload);
     }
 

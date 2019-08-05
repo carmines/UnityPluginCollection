@@ -1,10 +1,16 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="Generated Files\module.g.cpp" />
+    <Filter Include="Generated Files">
+      <UniqueIdentifier>{fe9639cd-8e74-4a26-be0d-0e8332474942}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
+    <ClCompile Include="dllmain.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="PropertySheet.props" />
     <None Include="packages.config" />
   </ItemGroup>
 </Project>

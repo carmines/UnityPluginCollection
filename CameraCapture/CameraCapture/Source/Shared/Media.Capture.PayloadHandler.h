@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/PayloadHandler.g.h"
+#include "Media.Capture.PayloadHandler.g.h"
 
 #include <mfapi.h>
 #include <mfidl.h>
@@ -23,7 +23,7 @@ namespace winrt::CameraCapture::Media::Capture::implementation
             __RPC__in_opt IMFAsyncResult *pAsyncResult);
 
         // PayloadHandler
-        HRESULT QueuePayload(Capture::Payload const& payload);
+        HRESULT QueuePayload(CameraCapture::Media::Capture::Payload const& payload);
 
         event_token OnSample(Windows::Foundation::EventHandler<Capture::Payload> const& handler)
         {
@@ -35,8 +35,8 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         }
 
     private:
-        slim_mutex m_mutex;
-        boolean m_isShutdown;
+		slim_mutex m_mutex;
+		boolean m_isShutdown;
         DWORD m_workItemQueueId;
 
         event<Windows::Foundation::EventHandler<Capture::Payload>> m_sampleEvent;

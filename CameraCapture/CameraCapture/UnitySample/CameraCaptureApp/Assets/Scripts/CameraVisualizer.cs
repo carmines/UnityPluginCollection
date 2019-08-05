@@ -3,14 +3,21 @@ using UnityEngine;
 
 public class CameraVisualizer : MonoBehaviour
 {
-    public SpatialCameraTracker cameraTracker;
+    public SpatialCameraTracker cameraTracker = null;
 
-    public LineRenderer imgbounds;
-    public Transform[] corners;
-    public Transform position;
+    public LineRenderer imgbounds = null;
+    public Transform[] corners = null;
+    public Transform targetTransform = null;
+
+    private Camera cameraCache = null;
 
     private void Awake()
     {
+        if (cameraCache == null)
+        {
+            cameraCache = Camera.main;
+        }
+
         if (cameraTracker == null)
         {
             Debug.LogError("Set the spatial camera tracker property before beginning.");
@@ -42,18 +49,18 @@ public class CameraVisualizer : MonoBehaviour
         Vector3 cameraPos = cameraTracker.transform.position;
 
         // update the offset from main camera to spatial camera
-        if (position != null)
+        if (targetTransform != null)
         {
-            Vector3 mainPos = Camera.main.transform.position;
-            Vector3 mainToSpatialOffset = cameraPos - mainPos;
+            Vector3 mainCameraPos = cameraCache.transform.position;
+            Vector3 mainToSpatialOffset = cameraPos - mainCameraPos;
 
-            position.localPosition = Vector3.Lerp(position.localPosition, mainToSpatialOffset, smooth);
+            targetTransform.localPosition = Vector3.Lerp(targetTransform.localPosition, mainToSpatialOffset, smooth);
         }
 
         // update corner verticies
         for (int i = 0; i < 4; i++)
         {
-            imgbounds.SetPosition(i, position.localPosition + cameraTracker.ImageCorners[i]);
+            imgbounds.SetPosition(i, targetTransform.localPosition + cameraTracker.ImageCorners[i]);
 
             if (i < corners.Length)
             {

@@ -6,13 +6,21 @@
 #include "Media.SharedTexture.h"
 #include "Media.Functions.h"
 
+#include <Mferror.h>
+#include <winrt/windows.perception.spatial.preview.h>
+#include <winrt/windows.foundation.metadata.h>
+
 using namespace winrt;
 using namespace Windows::Graphics::DirectX::Direct3D11;
+using namespace Windows::Perception;
 using namespace Windows::Perception::Spatial;
+using namespace Windows::Perception::Spatial::Preview;
 using namespace Windows::Foundation;
+using namespace Windows::Foundation::Metadata;
 using namespace Windows::Foundation::Numerics;
 
 #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+EXTERN_GUID(MFSampleExtension_DeviceTimestamp, 0x8f3e35e7, 0x2dcd, 0x4887, 0x86, 0x22, 0x2a, 0x58, 0xba, 0xa6, 0x52, 0xb0);
 EXTERN_GUID(MFSampleExtension_Spatial_CameraCoordinateSystem, 0x9d13c82f, 0x2199, 0x4e67, 0x91, 0xcd, 0xd1, 0xa4, 0x18, 0x1f, 0x25, 0x34);
 EXTERN_GUID(MFSampleExtension_Spatial_CameraViewTransform, 0x4e251fa4, 0x830f, 0x4770, 0x85, 0x9a, 0x4b, 0x8d, 0x99, 0xaa, 0x80, 0x9b);
 EXTERN_GUID(MFSampleExtension_Spatial_CameraProjectionTransform, 0x47f9fcb5, 0x2a02, 0x4f26, 0xa4, 0x77, 0x79, 0x2f, 0xdf, 0x95, 0x88, 0x6a);
@@ -121,9 +129,7 @@ SharedTexture::SharedTexture()
     , mediaSurface(nullptr)
     , mediaBuffer(nullptr)
     , mediaSample(nullptr)
-    , cameraToWorldMatrix{}
-    , cameraViewInWorldMatrix{}
-    , cameraViewMatrix{}
+    , cameraToWorldTransform{}
     , cameraProjectionMatrix{}
 {}
 
@@ -158,45 +164,103 @@ HRESULT SharedTexture::UpdateTransforms(
 {
     NULL_CHK_HR(appCoordinateSystem, E_INVALIDARG);
 
-    // camera coordinate system
-    com_ptr<ISpatialCoordinateSystem> cameraCoordinateSystem = nullptr;
-    IFR(mediaSample->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, guid_of<SpatialCoordinateSystem>(), cameraCoordinateSystem.put_void()));
+	if (ApiInformation::IsApiContractPresent(L"Windows.Foundation.UniversalApiContract", 8)
+		&&
+		ApiInformation::IsMethodPresent(L"Windows.Perception.Spatial.Preview.SpatialGraphInteropPreview", L"CreateLocatorForNode"))
+	{
+		IFR(UpdateTransformsV2(appCoordinateSystem));
+	}
+	else
+	{
+		// camera view
+		UINT32 sizeCameraView = 0;
+		Numerics::float4x4 cameraView{};
+		IFR(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &sizeCameraView));
 
-    auto transformRef = cameraCoordinateSystem.as<SpatialCoordinateSystem>().TryGetTransformTo(appCoordinateSystem);
-    NULL_CHK_HR(transformRef, E_POINTER);
+		// coordinate space
+		SpatialCoordinateSystem cameraCoordinateSystem = nullptr;
+		IFR(mediaSample->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, winrt::guid_of<SpatialCoordinateSystem>(), winrt::put_abi(cameraCoordinateSystem)));
 
-    // transform matrix to convert to app world space
-    float4x4 cameraToWorld = transformRef.Value();
+		// sample projection matrix
+		UINT32 sizeCameraProject = 0;
+		IFR(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&cameraProjectionMatrix, sizeof(cameraProjectionMatrix), &sizeCameraProject));
 
-    // sample camera view
-    UINT32 blobSize = 0;
-    float4x4 cameraView{}; // pv camera view matrix in camera space
-    IFR(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &blobSize));
+		auto transformRef = cameraCoordinateSystem.TryGetTransformTo(appCoordinateSystem);
+		NULL_CHK_HR(transformRef, E_POINTER);
 
-    // tranform to world space
-    float4x4 invertedCameraView{};
-    if (Numerics::invert(cameraView, &invertedCameraView))
-    {
-        // overwrite the cameraView with new value
-        invertedCameraView *= cameraToWorld;
-    }
+		// transform matrix to convert to app world space
+		const auto& cameraToWorld = transformRef.Value();
 
-    // sample projection matrix
-    float4x4 cameraProjection{};
-    IFR(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&cameraProjection, sizeof(cameraProjection), &blobSize));
+		// transform to world space
+		Numerics::float4x4 invertedCameraView{};
+		if (Numerics::invert(cameraView, &invertedCameraView))
+		{
+			// overwrite the cameraView with new value
+			invertedCameraView *= cameraToWorld;
+		}
 
-    // sample intrinsics
-    MFPinholeCameraIntrinsics cameraIntrinsics{};
-    IFR(mediaSample->GetBlob(MFSampleExtension_PinholeCameraIntrinsics, (UINT8*)&cameraIntrinsics, sizeof(cameraIntrinsics), &blobSize));
-
-    // sample extrinsics
-    MFCameraExtrinsics cameraExtrinsics{};
-    IFR(mediaSample->GetBlob(MFSampleExtension_CameraExtrinsics, (UINT8*)&cameraExtrinsics, sizeof(cameraExtrinsics), &blobSize));
-
-    cameraToWorldMatrix = cameraToWorld;
-    cameraViewInWorldMatrix = invertedCameraView;
-    cameraViewMatrix = cameraView;
-    cameraProjectionMatrix = cameraProjection;
+		cameraToWorldTransform = invertedCameraView;
+	}
 
     return S_OK;
+}
+
+HRESULT SharedTexture::UpdateTransformsV2(
+	SpatialCoordinateSystem const& appCoordinateSystem)
+{
+	UINT32 sizeCameraIntrinsics = 0;
+	MFPinholeCameraIntrinsics cameraIntrinsics;
+	IFR(mediaSample->GetBlob(MFSampleExtension_PinholeCameraIntrinsics, (UINT8 *)&cameraIntrinsics, sizeof(cameraIntrinsics), &sizeCameraIntrinsics));
+
+	UINT32 sizeCameraExtrinsics = 0;
+	MFCameraExtrinsics cameraExtrinsics;
+	IFR(mediaSample->GetBlob(MFSampleExtension_CameraExtrinsics, (UINT8 *)&cameraExtrinsics, sizeof(cameraExtrinsics), &sizeCameraExtrinsics));
+
+	UINT64 sampleTimeQpc = 0;
+	IFR(mediaSample->GetUINT64(MFSampleExtension_DeviceTimestamp, &sampleTimeQpc));
+
+	// query sample for calibration and validate
+	if ((sizeCameraExtrinsics != sizeof(cameraExtrinsics)) ||
+		(sizeCameraIntrinsics != sizeof(cameraIntrinsics)) ||
+		(cameraExtrinsics.TransformCount == 0))
+	{
+		return MF_E_INVALIDTYPE;
+	}
+
+	// get transform from extrinsics
+	const auto& calibratedTransform = cameraExtrinsics.CalibratedTransforms[0];
+
+	// update locator cache for dynamic node
+	const winrt::guid& dynamicNodeId = calibratedTransform.CalibrationId;
+	if (dynamicNodeId != m_currentDynamicNodeId || m_locator == nullptr)
+	{
+		m_locator = SpatialGraphInteropPreview::CreateLocatorForNode(dynamicNodeId);
+		NULL_CHK_HR(m_locator, MF_E_NOT_FOUND);
+
+		m_currentDynamicNodeId = dynamicNodeId;
+	}
+
+	// compute extrinsic transform from sample data
+	const auto& translation
+		= make_float4x4_translation(calibratedTransform.Position.x, calibratedTransform.Position.y, calibratedTransform.Position.z);
+	const auto& rotation
+		= make_float4x4_from_quaternion(Numerics::quaternion{ calibratedTransform.Orientation.x, calibratedTransform.Orientation.y, calibratedTransform.Orientation.z, calibratedTransform.Orientation.w });
+	const auto& cameraToDynamicNode
+		= rotation * translation;
+
+	// locate dynamic node with respect to appCoordinateSystem
+	const auto& timestamp = PerceptionTimestampHelper::FromSystemRelativeTargetTime(TimeSpanFromQpcTicks(sampleTimeQpc));
+	const auto& location = m_locator.TryLocateAtTimestamp(timestamp, appCoordinateSystem);
+	NULL_CHK_HR(location, MF_E_NOT_FOUND);
+
+	const auto& dynamicNodeToCoordinateSystem
+		= make_float4x4_from_quaternion(location.Orientation()) * make_float4x4_translation(location.Position());
+
+	// transform for camera -> app world space
+	cameraToWorldTransform = cameraToDynamicNode * dynamicNodeToCoordinateSystem;
+
+	// get the projection
+	cameraProjectionMatrix = GetProjection(cameraIntrinsics);
+
+	return S_OK;
 }

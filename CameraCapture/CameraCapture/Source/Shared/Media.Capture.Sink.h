@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/Sink.g.h"
+#include "Media.Capture.Sink.g.h"
 #include "Media.Capture.StreamSink.h"
 
 #include <mfapi.h>
@@ -91,8 +91,8 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         }
 
     private:
-        slim_mutex m_lock;
-        std::atomic<Capture::State> m_currentState;
+		slim_mutex m_mutex;
+		std::atomic<Capture::State> m_currentState;
 
         std::list<com_ptr<IMFStreamSink>> m_streamSinks;
         com_ptr<IMFPresentationClock> m_presentationClock;

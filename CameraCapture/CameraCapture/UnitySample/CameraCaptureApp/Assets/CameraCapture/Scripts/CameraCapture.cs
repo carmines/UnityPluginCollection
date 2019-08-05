@@ -44,8 +44,6 @@ namespace CameraCapture
         {
             base.OnEnable();
 
-            CreateCapture();
-
             if (Application.HasUserAuthorization(UserAuthorization.WebCam))
             {
                 Application.RequestUserAuthorization(UserAuthorization.WebCam);
@@ -55,6 +53,8 @@ namespace CameraCapture
             {
                 Application.RequestUserAuthorization(UserAuthorization.Microphone);
             }
+
+            CreateCapture();
 
             if (videoRenderer != null)
             {
@@ -128,6 +128,12 @@ namespace CameraCapture
             {
                 cameraTracker.UpdateCameraMatrices(state.cameraWorld, state.cameraProjection);
             }
+        }
+
+        private void CreateCapture()
+        {
+            IntPtr thisObjectPtr = GCHandle.ToIntPtr(thisObject);
+            CheckHR(Wrapper.CreateCapture(stateChangedCallback, thisObjectPtr, out instanceId));
         }
 
         private static class Native

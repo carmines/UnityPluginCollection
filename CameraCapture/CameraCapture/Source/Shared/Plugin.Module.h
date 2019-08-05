@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Plugin/Module.g.h"
+#include "Plugin.Module.g.h"
 #include "D3D11DeviceResources.h"
 
 struct __declspec(uuid("34fe2ecf-68d3-4732-a05a-2a737b63c386")) IModulePriv : ::IUnknown
@@ -17,10 +17,10 @@ namespace winrt::CameraCapture::Plugin::implementation
 {
     struct Module : ModuleT<Module, IModulePriv>
     {
-        Module() = default;
+		Module() = default;
 
-        virtual void Shutdown();
-        virtual void OnRenderEvent(uint16_t frameNumber);
+		void Shutdown();
+		void OnRenderEvent(uint16_t frameNumber);
 
         // IModulePriv
         STDOVERRIDEMETHODIMP Initialize(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback, _In_ void* pCallbackObject);
@@ -29,6 +29,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
     protected:
         std::weak_ptr<IUnityDeviceResource> m_deviceResources;
+        std::weak_ptr<ID3D11DeviceResource> m_d3d11DeviceResources;
 
     private:
         slim_mutex m_mutex;

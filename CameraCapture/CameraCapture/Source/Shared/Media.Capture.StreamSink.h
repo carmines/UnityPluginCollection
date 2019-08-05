@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/StreamSink.g.h"
+#include "Media.Capture.StreamSink.g.h"
 
 #include <mfapi.h>
 #include <mfidl.h>
@@ -115,8 +115,8 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         STDMETHODIMP NotifyRequestSample();
 
     private:
-        slim_mutex m_lock;
-        slim_mutex m_eventLock;
+		slim_mutex m_mutex;
+		slim_mutex m_eventMutex;
 
         std::atomic<Capture::State> m_currentState;
         LONGLONG m_clockStartOffset;    // Presentation time when the clock started.

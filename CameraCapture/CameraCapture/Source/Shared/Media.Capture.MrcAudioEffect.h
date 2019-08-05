@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "Media/Capture/MrcAudioEffect.g.h"
+#include "Media.Capture.MrcAudioEffect.g.h"
 #include <winrt/Windows.Foundation.Collections.h>
 
 namespace winrt::CameraCapture::Media::Capture::implementation

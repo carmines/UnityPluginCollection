@@ -3,6 +3,8 @@
 
 #include "pch.h"
 #include "Plugin.CaptureEngine.h"
+#include "Plugin.CaptureEngine.g.cpp"
+
 #include "Media.Functions.h"
 #include "Media.Capture.Payload.h"
 #include "Media.Capture.MrcAudioEffect.h"
@@ -191,14 +193,11 @@ HRESULT CaptureEngine::CreateDeviceResources()
         return S_OK;
     }
 
-    auto resources = m_deviceResources.lock();
+    auto resources = m_d3d11DeviceResources.lock();
     NULL_CHK_HR(resources, MF_E_UNEXPECTED);
 
-    com_ptr<ID3D11DeviceResource> spD3D11Resources;
-    IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
-
-    com_ptr<IDXGIDevice> dxgiDevice = nullptr;
-    IFR(spD3D11Resources->GetDevice()->QueryInterface(guid_of<IDXGIDevice>(), dxgiDevice.put_void()));
+	com_ptr<IDXGIDevice> dxgiDevice = nullptr;
+	IFR(resources->GetDevice()->QueryInterface(guid_of<IDXGIDevice>(), dxgiDevice.put_void()));
 
     com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
     IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
@@ -340,19 +339,19 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     auto payloadHandler = make<PayloadHandler>();
     mediaSink.PayloadHandler(payloadHandler);
 
+	std::lock_guard<slim_mutex> guard(m_mutex);
+
     // store locals
     m_mediaSink = mediaSink;
     m_payloadHandler = payloadHandler;
 
     co_await calling_thread; // switch back to calling context
 
-    auto guard = slim_lock_guard(m_mutex);
-
     m_sampleEventToken = m_payloadHandler.OnSample([this](auto const sender, Media::Capture::Payload const payload)
     {
         UNREFERENCED_PARAMETER(sender);
 
-        auto guard = slim_lock_guard(m_mutex);
+		std::shared_lock<slim_mutex> slock(m_mutex);
 
         if (m_isShutdown)
         {
@@ -412,17 +411,13 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
                 ||
                 m_videoBuffer->frameTextureDesc.Height != videoProps.Height())
             {
-                auto resources = m_deviceResources.lock();
+				auto resources = m_d3d11DeviceResources.lock();
+				NULL_CHK_R(resources);
 
-                NULL_CHK_R(resources);
+				// make sure we have created our own d3d device
+				IFV(CreateDeviceResources());
 
-                com_ptr<ID3D11DeviceResource> spD3D11Resources = nullptr;
-                IFV(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
-
-                // make sure we have created our own d3d device
-                IFV(CreateDeviceResources());
-                
-                IFV(SharedTexture::Create(spD3D11Resources->GetDevice().get(), m_dxgiDeviceManager.get(), videoProps.Width(), videoProps.Height(), m_videoBuffer));
+				IFV(SharedTexture::Create(resources->GetDevice().get(), m_dxgiDeviceManager.get(), videoProps.Width(), videoProps.Height(), m_videoBuffer));
 
                 bufferChanged = true;
             }
@@ -448,7 +443,7 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
             {
                 if (SUCCEEDED(m_videoBuffer->UpdateTransforms(m_appCoordinateSystem)))
                 {
-                    state.value.captureState.worldMatrix = m_videoBuffer->cameraViewInWorldMatrix;
+                    state.value.captureState.worldMatrix = m_videoBuffer->cameraToWorldTransform;
                     state.value.captureState.projectionMatrix = m_videoBuffer->cameraProjectionMatrix;
 
                     bufferChanged = true;
@@ -513,30 +508,30 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
         co_return;
     }
 
+    auto audioDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::AudioCapture);
+	auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
+
+
+
+
+
     auto initSettings = MediaCaptureInitializationSettings();
-
-    auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
-
+    initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+    initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
+    initSettings.StreamingCaptureMode(enableAudio ? StreamingCaptureMode::AudioAndVideo : StreamingCaptureMode::Video);
     initSettings.VideoDeviceId(videoDevice.Id());
-
     if (enableAudio)
     {
-        auto audioDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::AudioCapture);
-
         initSettings.AudioDeviceId(audioDevice.Id());
     }
-
-    initSettings.MediaCategory(category);
-    initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
     initSettings.PhotoCaptureSource(enableAudio ? PhotoCaptureSource::Auto : PhotoCaptureSource::VideoPreview);
-    initSettings.StreamingCaptureMode(enableAudio ? StreamingCaptureMode::AudioAndVideo : StreamingCaptureMode::Video);
-    initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+    initSettings.MediaCategory(category);
 
+	// set the DXGIManger for the media capture
     auto advancedInitSettings = initSettings.as<IAdvancedMediaCaptureInitializationSettings>();
     IFT(advancedInitSettings->SetDirectxDeviceManager(m_dxgiDeviceManager.get()));
 
     auto mediaCapture = Windows::Media::Capture::MediaCapture();
-
     co_await mediaCapture.InitializeAsync(initSettings);
 
     m_mediaCapture = mediaCapture;
