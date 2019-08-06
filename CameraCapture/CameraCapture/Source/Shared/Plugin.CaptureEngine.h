@@ -63,8 +63,11 @@ namespace winrt::CameraCapture::Plugin::implementation
         com_ptr<IMFDXGIDeviceManager> m_dxgiDeviceManager;
 
         // media capture
-        Windows::Media::Capture::MediaStreamType m_streamType;
+		Windows::Media::Capture::MediaCategory m_category;
+		Windows::Media::Capture::MediaStreamType m_streamType;
+		Windows::Media::Capture::KnownVideoProfile m_videoProfile;
         Windows::Media::Capture::MediaCapture m_mediaCapture;
+		Windows::Media::Capture::MediaCaptureInitializationSettings m_initSettings;
 
         Windows::Media::IMediaExtension m_mrcAudioEffect;
         Windows::Media::IMediaExtension m_mrcVideoEffect;

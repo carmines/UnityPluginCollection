@@ -46,9 +46,12 @@ CaptureEngine::CaptureEngine()
     : m_isShutdown(false)
     , m_startPreviewOp(nullptr)
     , m_stopPreviewOp(nullptr)
-    , m_streamType(MediaStreamType::VideoPreview)
     , m_mediaCapture(nullptr)
-    , m_mrcAudioEffect(nullptr)
+	, m_initSettings(nullptr)
+	, m_category(MediaCategory::Communications)
+	, m_streamType(MediaStreamType::VideoPreview)
+	, m_videoProfile(KnownVideoProfile::VideoConferencing)
+	, m_mrcAudioEffect(nullptr)
     , m_mrcVideoEffect(nullptr)
     , m_mrcPreviewEffect(nullptr)
     , m_mediaSink(nullptr)
@@ -260,7 +263,7 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 
     if (m_mediaCapture == nullptr)
     {
-        co_await CreateMediaCaptureAsync(enableAudio, MediaCategory::Communications);
+        co_await CreateMediaCaptureAsync(enableAudio, m_category);
     }
     else
     {
@@ -271,17 +274,20 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     auto videoController = m_mediaCapture.VideoDeviceController();
     videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
 
-    auto videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoRecord, width, height, MediaEncodingSubtypes::Nv12());
-    co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoRecord, videoEncProps);
+	if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
+	{
+		auto videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoRecord, width, height, MediaEncodingSubtypes::Nv12());
+		co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoRecord, videoEncProps);
 
-    auto captureSettings = m_mediaCapture.MediaCaptureSettings();
-    if (captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::AllStreamsIdentical
-        &&
-        captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
-    {
-        videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoPreview, width, height, MediaEncodingSubtypes::Nv12());
-        co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoPreview, videoEncProps);
-    }
+		auto captureSettings = m_mediaCapture.MediaCaptureSettings();
+		if (captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::AllStreamsIdentical
+			&&
+			captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
+		{
+			videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoPreview, width, height, MediaEncodingSubtypes::Nv12());
+			co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoPreview, videoEncProps);
+		}
+	}
 
     // encoding profile based on 720p
     auto encodingProfile = MediaEncodingProfile::CreateMp4(VideoEncodingQuality::HD720p);
@@ -511,10 +517,22 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     auto audioDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::AudioCapture);
 	auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
 
+	// does device support KnownVideoProfiles, then use the type we defined
+	MediaCaptureVideoProfile videoProfile = nullptr;
+	MediaCaptureVideoProfileMediaDescription videoProfileMediaDescription = nullptr;
+	auto profiles = MediaCapture::FindKnownVideoProfiles(videoDevice.Id(), m_videoProfile);
+	for (auto const profile : profiles)
+	{
+		auto const& videoProfileMediaDescriptions = m_streamType == (MediaStreamType::VideoPreview) ? profile.SupportedPreviewMediaDescription() : profile.SupportedRecordMediaDescription();
+		for (auto const mediaDescription : videoProfileMediaDescriptions)
+		{
+			videoProfile = profile;
+			videoProfileMediaDescription = mediaDescription;
+			break;
+		}
+	}
 
-
-
-
+	// initialize settings
     auto initSettings = MediaCaptureInitializationSettings();
     initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
     initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
@@ -526,6 +544,15 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     }
     initSettings.PhotoCaptureSource(enableAudio ? PhotoCaptureSource::Auto : PhotoCaptureSource::VideoPreview);
     initSettings.MediaCategory(category);
+	initSettings.VideoProfile(videoProfile);
+	if (m_streamType == MediaStreamType::VideoPreview)
+	{
+		initSettings.PreviewMediaDescription(videoProfileMediaDescription);
+	}
+	else
+	{
+		initSettings.RecordMediaDescription(videoProfileMediaDescription);
+	}
 
 	// set the DXGIManger for the media capture
     auto advancedInitSettings = initSettings.as<IAdvancedMediaCaptureInitializationSettings>();
@@ -535,6 +562,7 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     co_await mediaCapture.InitializeAsync(initSettings);
 
     m_mediaCapture = mediaCapture;
+	m_initSettings = initSettings;
 }
 
 IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
