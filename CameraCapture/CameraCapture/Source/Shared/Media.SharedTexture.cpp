@@ -131,6 +131,10 @@ SharedTexture::SharedTexture()
     , mediaSample(nullptr)
     , cameraToWorldTransform{}
     , cameraProjectionMatrix{}
+	, m_useNewApi(
+		ApiInformation::IsApiContractPresent(L"Windows.Foundation.UniversalApiContract", 8)
+		&&
+		ApiInformation::IsMethodPresent(L"Windows.Perception.Spatial.Preview.SpatialGraphInteropPreview", L"CreateLocatorForNode"))
 {}
 
 SharedTexture::~SharedTexture()
@@ -164,9 +168,7 @@ HRESULT SharedTexture::UpdateTransforms(
 {
     NULL_CHK_HR(appCoordinateSystem, E_INVALIDARG);
 
-	if (ApiInformation::IsApiContractPresent(L"Windows.Foundation.UniversalApiContract", 8)
-		&&
-		ApiInformation::IsMethodPresent(L"Windows.Perception.Spatial.Preview.SpatialGraphInteropPreview", L"CreateLocatorForNode"))
+	if (m_useNewApi)
 	{
 		IFR(UpdateTransformsV2(appCoordinateSystem));
 	}

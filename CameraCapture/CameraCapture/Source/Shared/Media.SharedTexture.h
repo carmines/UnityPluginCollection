@@ -89,6 +89,7 @@ private:
 	}
 
 private:
+	boolean m_useNewApi;
 	winrt::guid m_currentDynamicNodeId;
 	winrt::Windows::Perception::Spatial::SpatialLocator m_locator{ nullptr };
 	winrt::Windows::Perception::Spatial::SpatialLocatorAttachedFrameOfReference m_frameOfReference{ nullptr };
