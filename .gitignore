@@ -331,4 +331,9 @@ ASALocalRun/
 **/Build
 **/Library
 **/Temp
+
+# remove generated Unity folders and files so they are regenerated when cloning repo
 **/UnityPackageManager
+**/UnitySample/*/*.sln
+**/UnitySample/*/*.csproj
+**/*.pdb.meta
