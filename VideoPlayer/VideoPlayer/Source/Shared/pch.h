@@ -3,11 +3,16 @@
 
 #pragma once
 
+#include <memory>
+#include <shared_mutex>
+
 #define WIN32_LEAN_AND_MEAN
 
 // cppwrint
+#include <unknwn.h>
 #include <winrt/base.h>
 #include <winrt/windows.foundation.h>
+#include <winrt/windows.foundation.collections.h>
 
 #ifndef IFR
 #define IFR(hresult) { HRESULT hrTest = hresult; if (FAILED(hrTest)) { return hrTest; } } 
@@ -60,7 +65,7 @@ typedef struct _PLAYBACK_STATE
     MediaPlayerState state;
     int32_t width;
     int32_t height;
-    boolean canSeek;
+    bool canSeek;
     int64_t duration;
 } PLAYBACK_STATE;
 

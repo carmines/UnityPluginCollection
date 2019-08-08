@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "Plugin/PlaybackManager.g.h"
+#include "Plugin.PlaybackManager.g.h"
 #include "Plugin.Module.h"
 #include "D3D11DeviceResources.h"
 #include "MediaHelpers.h"

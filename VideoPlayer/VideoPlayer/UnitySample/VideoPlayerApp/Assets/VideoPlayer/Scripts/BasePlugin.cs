@@ -96,26 +96,25 @@ namespace VideoPlayer
 
     internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
     {
-
-        protected void CreateMediaPlayer(Wrapper.StateChangedCallback callback)
-        {
-            // define callback function
-            stateChangedCallback = callback;
-
-            IntPtr thisObjectPtr = GCHandle.ToIntPtr(thisObject);
-
-            CheckHR(Wrapper.CreateMediaPlayer(stateChangedCallback, thisObjectPtr, out instanceId));
-        }
-
+        // callback handler for derived class
         protected abstract void OnCallback(Wrapper.CallbackType type, Wrapper.CallbackState args);
 
+        // instance returned from plugin
         protected Int32 instanceId = Wrapper.InvalidHandle;
 
+        // current frame index
         protected UInt16 currentFrameIndex = 0;
 
+        // delegate function used for callback, uses CallbackWrapper static method
+        protected Wrapper.StateChangedCallback stateChangedCallback
+            // = new Wrapper.StateChangedCallback(CallbackWrapper<T>.OnCallback);
+            = new Wrapper.StateChangedCallback(CallbackWrapper.OnCallback);
+
+        // pin GC memory location for the object
+        protected GCHandle thisObject = default(GCHandle);
+
+        // pointer of the render function in plugin
         private IntPtr renderFuncPtr = IntPtr.Zero;
-        private GCHandle thisObject = default(GCHandle);
-        private Wrapper.StateChangedCallback stateChangedCallback = null;
 
         // async queue
         private IEnumerator coroutine = null;

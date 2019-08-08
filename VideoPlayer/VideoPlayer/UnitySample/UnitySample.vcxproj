@@ -6,19 +6,23 @@
     <RootNamespace>Unity</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommand>C:\Unity\Editors\2019.1.12f1\Editor\Unity.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommandArguments>-projectPath $(ProjectDir)$(SolutionName)App</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)$(SolutionName)App</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommand>C:\Unity\Editors\2019.1.12f1\Editor\Unity.exe</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>-projectPath $(ProjectDir)$(SolutionName)App</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)$(SolutionName)App</LocalDebuggerWorkingDirectory>
+  </PropertyGroup>
   <PropertyGroup>
     <OutDir>$(SolutionDir)Build\$(Configuration)\$(ProjectName)\$(PlatformShortName)\</OutDir>
     <IntDir>$(SolutionDir)Temp\$(ProjectName)\$(Configuration)\$(PlatformShortName)\</IntDir>
   </PropertyGroup>
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -39,28 +43,5 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemGroup>
     <None Include="readme.txt" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Plugins.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Plugins\WSA\x64\VideoPlayer.dll.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Plugins\WSA\x86\VideoPlayer.dll.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Plugins\x64\VideoPlayer.dll.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Plugins\x86\VideoPlayer.dll.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Scripts.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Scripts\BasePlugin.cs" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Scripts\BasePlugin.cs.meta" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Scripts\Mesh.cs" />
-    <None Include="VideoPlayerApp\Assets\VideoPlayer\Scripts\Mesh.cs.meta" />
-    <None Include="VideoPlayerApp\Assets\Materials.meta" />
-    <None Include="VideoPlayerApp\Assets\Materials\VertexColor.mat" />
-    <None Include="VideoPlayerApp\Assets\Materials\VertexColor.mat.meta" />
-    <None Include="VideoPlayerApp\Assets\Scenes.meta" />
-    <None Include="VideoPlayerApp\Assets\Scenes\Sample.unity" />
-    <None Include="VideoPlayerApp\Assets\Scenes\Sample.unity.meta" />
-    <None Include="VideoPlayerApp\Assets\Scripts.meta" />
-    <None Include="VideoPlayerApp\Assets\Scripts\Spin.cs" />
-    <None Include="VideoPlayerApp\Assets\Scripts\Spin.cs.meta" />
-    <None Include="VideoPlayerApp\Assets\Shaders.meta" />
-    <None Include="VideoPlayerApp\Assets\Shaders\VertexColor.shader" />
-    <None Include="VideoPlayerApp\Assets\Shaders\VertexColor.shader.meta" />
   </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@
 #include "pch.h"
 #include "MediaHelpers.h"
 
+#include <winrt/windows.media.playback.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 
 using namespace winrt;

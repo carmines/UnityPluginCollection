@@ -1,5 +1,6 @@
 ﻿#include "pch.h"
 #include "Plugin.PlaybackManager.h"
+#include "Plugin.PlaybackManager.g.cpp"
 
 #include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
@@ -72,16 +73,13 @@ HRESULT PlaybackManager::CreatePlaybackTexture(
 
     m_primaryBuffer->Reset();
 
-    auto resources = m_deviceResources.lock();
+    auto resources = m_d3d11DeviceResources.lock();
     NULL_CHK_HR(resources, E_POINTER);
 
-    com_ptr<ID3D11DeviceResource> spD3D11Resources = nullptr;
-    IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
-
     // make sure we have created our own d3d device
-    IFR(CreateResources(spD3D11Resources->GetDevice()));
+    IFR(CreateResources(resources->GetDevice()));
 
-    IFR(SharedTextureBuffer::Create(spD3D11Resources->GetDevice().get(), m_dxgiDeviceManager.get(), width, height, m_primaryBuffer));
+    IFR(SharedTextureBuffer::Create(resources->GetDevice().get(), m_dxgiDeviceManager.get(), width, height, m_primaryBuffer));
 
     com_ptr<ID3D11ShaderResourceView> spSRV = nullptr;
     m_primaryBuffer->frameTextureSRV.copy_to(spSRV.put());

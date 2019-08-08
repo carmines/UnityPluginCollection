@@ -3,6 +3,7 @@
 
 #include "pch.h"
 #include "Plugin.Module.h"
+#include "Plugin.Module.g.cpp"
 
 using namespace winrt;
 using namespace VideoPlayer::Plugin::implementation;
@@ -11,16 +12,17 @@ using namespace Windows::Foundation;
 _Use_decl_annotations_
 void Module::Shutdown()
 {
-    auto guard = slim_lock_guard(m_mutex);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     m_deviceResources.reset();
+	m_d3d11DeviceResources.reset();
 }
 
 _Use_decl_annotations_
 void Module::OnRenderEvent(
     uint16_t frameNumber)
 {
-    auto guard = slim_shared_lock_guard(m_mutex);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     UNREFERENCED_PARAMETER(frameNumber);
 }
@@ -31,19 +33,17 @@ HRESULT Module::Initialize(
     StateChangedCallback stateCallback, 
     void* pCallbackObject)
 {
-    auto guard = slim_lock_guard(m_mutex);
+	std::lock_guard<slim_mutex> guard(m_mutex);
 
     NULL_CHK_HR(stateCallback, E_INVALIDARG);
 
     auto resources = unityDevice.lock();
     if (resources != nullptr)
     {
-        com_ptr<ID3D11DeviceResource> spD3D11Resources = nullptr;
-        IFR(resources->QueryInterface(__uuidof(ID3D11DeviceResource), spD3D11Resources.put_void()));
-
         m_pClientObject = pCallbackObject;
         m_stateCallbacks = stateCallback;
         m_deviceResources = unityDevice;
+		m_d3d11DeviceResources = std::dynamic_pointer_cast<ID3D11DeviceResource>(resources);
     }
 
     return S_OK;
@@ -53,7 +53,7 @@ _Use_decl_annotations_
 HRESULT Module::Callback(
     CALLBACK_STATE state)
 {
-    auto guard = slim_lock_guard(m_mutex);
+	std::shared_lock<slim_mutex> slock(m_mutex);
 
     NULL_CHK_HR(m_stateCallbacks, S_OK);
 
