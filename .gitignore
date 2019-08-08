@@ -336,5 +336,6 @@ ASALocalRun/
 **/UnityPackageManager
 **/UnitySample/*/*.sln
 **/UnitySample/*/*.csproj
-**/UnitySample/*/*.pdb.meta
-**/UnitySample/*/*.pfx.meta
+**/*.pdb.meta
+**/*.pfx.meta
+
