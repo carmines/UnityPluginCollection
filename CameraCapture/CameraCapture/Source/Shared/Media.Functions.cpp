@@ -154,49 +154,65 @@ IMediaEncodingProperties GetVideoDeviceProperties(
     uint32_t height,
     hstring subType)
 {
-    // select a camera property that meets the resolution at the highest framerate
-    auto preferredSettings = videoDeviceController.GetAvailableMediaStreamProperties(mediaStreamType);
-    if (preferredSettings.Size() == 0)
-    {
-        return nullptr;
-    }
+	// select a camera property that meets the resolution at the highest framerate
+	auto preferredSettings = videoDeviceController.GetAvailableMediaStreamProperties(mediaStreamType);
+	if (preferredSettings.Size() == 0)
+	{
+		return nullptr;
+	}
 
-    IVideoEncodingProperties mediaProperty = nullptr;
-    for (auto&& encodingProperty : preferredSettings)
-    {
-        // validate it is video
-        if (encodingProperty.Type() != L"Video")
-        {
-            continue;
-        }
+	Log(L"Total available MediaStreamProperties for %s: %i\n", videoDeviceController.Id().c_str(), preferredSettings.Size());
 
-        // Try find the highest resolution supported
-        auto videoEncodingProperty = encodingProperty.as<IVideoEncodingProperties>();
+	setlocale(LC_ALL, "");
 
-        Log(L"%s Props: %d x %d @ %d/%d fps\n", videoEncodingProperty.Subtype().c_str(), videoEncodingProperty.Width(), videoEncodingProperty.Height(), videoEncodingProperty.FrameRate().Numerator(), videoEncodingProperty.FrameRate().Denominator());
+	IMediaEncodingProperties mediaEncodingProperty = nullptr;
+	auto const& found = std::find_if(begin(preferredSettings), end(preferredSettings), [&](IMediaEncodingProperties const& prop)
+		{
+			// validate it is video
+			if (prop.Type() != L"Video")
+			{
+				false;
+			}
 
-        if (videoEncodingProperty.Width() >= width && videoEncodingProperty.Height() >= height)
-        {
-            if (mediaProperty == nullptr)
-            {
-                mediaProperty = videoEncodingProperty;
-            }
+			auto videoProperty = prop.as<IVideoEncodingProperties>();
 
-            // make sure the framerate is the highest for this property
-            double currentFPS = mediaProperty.FrameRate().Numerator() / mediaProperty.FrameRate().Denominator();
-            double newFPS = videoEncodingProperty.FrameRate().Numerator() / videoEncodingProperty.FrameRate().Denominator();
-            if ((mediaProperty.Width() < videoEncodingProperty.Width() || mediaProperty.Height() < videoEncodingProperty.Height())
-                &&
-                currentFPS < newFPS
-                &&
-                videoEncodingProperty.Subtype() == subType)
-            {
-                mediaProperty = videoEncodingProperty;
-            }
-        }
-    }
+			if (mediaEncodingProperty == nullptr)
+			{
+				mediaEncodingProperty = videoProperty;
+			}
 
-    return mediaProperty;
+			Log(L"\tFormat: %s: %i x %i @ %d/%d fps",
+				prop.Subtype().c_str(),
+				videoProperty.Width(),
+				videoProperty.Height(),
+				videoProperty.FrameRate().Numerator(),
+				videoProperty.FrameRate().Denominator());
+
+			// select a size that will be == width/height @ 30fps, final size will be set with enc props
+			double fps = videoProperty.FrameRate().Numerator() / videoProperty.FrameRate().Denominator();
+			bool match =
+				_wcsicmp(videoProperty.Subtype().c_str(), subType.c_str()) == 0 &&
+				videoProperty.Width() == width &&
+				videoProperty.Height() == height &&
+				fps == 30.0;
+			if (match)
+			{
+				Log(L" - found\n");
+			}
+			else
+			{
+				Log(L"\n");
+			}
+
+			return match;
+		});
+
+	if (found != end(preferredSettings))
+	{
+		mediaEncodingProperty = *found;
+	}
+
+	return mediaEncodingProperty;
 }
 
 _Use_decl_annotations_

@@ -45,7 +45,7 @@ namespace winrt::CameraCapture::Plugin::implementation
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
         Windows::Foundation::IAsyncAction StopPreviewCoroutine();
 
-        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(boolean const enableAudio, Windows::Media::Capture::MediaCategory const category);
+        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(boolean const& enableAudio, uint32_t const& width, uint32_t const& height);
         Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
 
         Windows::Foundation::IAsyncAction AddMrcEffectsAsync(boolean const enableAudio);
@@ -66,6 +66,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 		Windows::Media::Capture::MediaCategory m_category;
 		Windows::Media::Capture::MediaStreamType m_streamType;
 		Windows::Media::Capture::KnownVideoProfile m_videoProfile;
+		Windows::Media::Capture::MediaCaptureSharingMode m_sharingMode;
         Windows::Media::Capture::MediaCapture m_mediaCapture;
 		Windows::Media::Capture::MediaCaptureInitializationSettings m_initSettings;
 
