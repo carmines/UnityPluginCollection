@@ -14,7 +14,7 @@ public class SpatialCameraTracker : MonoBehaviour
     private Spatial4x4 cameraProjection = Spatial4x4.Zero;
     private Spatial4x4 lastGoodCameraProjection = Spatial4x4.Zero;
 
-    private readonly Vector2[] viewport = new Vector2[] { new Vector2(0.0f, 0.0f),  new Vector2(0.0f, 1.0f), new Vector2(1.0f, 1.0f), new Vector2(1.0f, 0.0f) };
+    private readonly Vector2[] viewportUVs = new Vector2[] { new Vector2(0.0f, 0.0f),  new Vector2(0.0f, 1.0f), new Vector2(1.0f, 1.0f), new Vector2(1.0f, 0.0f) };
 
     private void Awake()
     {
@@ -89,9 +89,9 @@ public class SpatialCameraTracker : MonoBehaviour
 
         ImageCenter = WorldPoint(new Vector2(.5f, .5f), transformMatrix.Value, projectionMatrix.Value);
 
-        for (int i = 0; i < viewport.Length; i++)
+        for (int i = 0; i < viewportUVs.Length; i++)
         {
-            ImageCorners[i] = WorldPoint(viewport[i], transformMatrix.Value, projectionMatrix.Value);
+            ImageCorners[i] = WorldPoint(viewportUVs[i], transformMatrix.Value, projectionMatrix.Value);
         }
     }
 
@@ -100,14 +100,14 @@ public class SpatialCameraTracker : MonoBehaviour
     // V1:1280x720  1280x720    1280x720    45deg                               (default mode)
     // V2:2272x1278 2272x1278   3904x2196   64.69                               (legacy)
 
-    public static Vector3 WorldPoint(Vector2 uv, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
+    private static Vector3 WorldPoint(Vector2 uv, Matrix4x4 cameraTransform, Matrix4x4 cameraProjection)
     {
         Vector3 imagePosProj = (uv * 2.0f) - Vector2.one; // -1 to 1 space
         Vector3 cameraSpacePos = UnProjectVector(cameraProjection, imagePosProj);
         return cameraTransform.MultiplyVector(cameraSpacePos);
     }
 
-    public static Vector3 UnProjectVector(Matrix4x4 projectionMatrix, Vector3 imagePosProjected)
+    private static Vector3 UnProjectVector(Matrix4x4 projectionMatrix, Vector3 imagePosProjected)
     {
         Vector3 from = Vector3.zero;
 

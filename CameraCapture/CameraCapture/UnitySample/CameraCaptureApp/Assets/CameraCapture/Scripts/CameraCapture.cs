@@ -109,17 +109,24 @@ namespace CameraCapture
         {
             if (videoTexture == null)
             {
+                if (state.width != width || state.height != height)
+                {
+                    Debug.LogWarningFormat("Video texture does not match the size requested, using {0} x {1}", state.width, state.height);
+                }
+
                 videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
 
                 if (videoRenderer != null)
                 {
                     videoRenderer.enabled = true;
-                    videoRenderer.material.SetTexture("_MainTex", videoTexture);
-                    videoRenderer.material.SetTextureScale("_MainTex", new Vector2(1, -1));
+                    videoRenderer.sharedMaterial.SetTexture("_MainTex", videoTexture);
+                    videoRenderer.sharedMaterial.SetTextureScale("_MainTex", new Vector2(1, -1)); // flip texture
                 }
             }
             else if (videoTexture.width != state.width || videoTexture.height != state.height)
             {
+                Debug.LogWarningFormat("Video texture size changed, using {0} x {1}", state.width, state.height);
+
                 videoTexture.UpdateExternalTexture(state.imgTexture);
             }
 
