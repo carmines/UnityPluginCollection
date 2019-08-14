@@ -457,7 +457,7 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
             state.value.captureState.height = m_videoBuffer->frameTextureDesc.Height;
             state.value.captureState.texturePtr = m_videoBuffer->frameTextureSRV.get();
 
-            // if there is coordinate space information, raise callback
+            // if there is transform change, update matricies
             if (m_appCoordinateSystem != nullptr)
             {
                 if (SUCCEEDED(m_videoBuffer->UpdateTransforms(m_appCoordinateSystem)))

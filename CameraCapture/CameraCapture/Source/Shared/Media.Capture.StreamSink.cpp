@@ -23,6 +23,11 @@ StreamSink::StreamSink(
     , m_streamIndex(index)
     , m_parentSink(parent)
     , m_encodingProperties(encodingProperties)
+	, m_setDiscontinuity(false)
+	, m_enableSampleRequests(true)
+	, m_sampleRequests(0)
+	, m_lastTimestamp(-1)
+	, m_lastDecodeTime(-1)
 {
     IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(encodingProperties), m_mediaType.put()));
     IFT(m_mediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
@@ -36,6 +41,11 @@ StreamSink::StreamSink(
     winrtSink const& parent)
     : m_streamIndex(index)
     , m_parentSink(parent)
+	, m_setDiscontinuity(false)
+	, m_enableSampleRequests(true)
+	, m_sampleRequests(0)
+	, m_lastTimestamp(-1)
+	, m_lastDecodeTime(-1)
 {
     IFT(pMediaType->QueryInterface(__uuidof(IMFMediaType), m_mediaType.put_void()));
     IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
@@ -97,6 +107,11 @@ HRESULT StreamSink::Flush()
 
 	std::shared_lock<slim_mutex> slock(m_mutex);
 
+	m_enableSampleRequests = TRUE;
+	m_sampleRequests = 0;
+	m_lastTimestamp = -1;
+	m_lastDecodeTime = -1;
+
     //auto payloadProcessor = m_parentMediaSink.as<MixedRemoteViewCompositor::Media::NetworkMediaSink>().PayloadProcessor();
     //if (payloadProcessor != nullptr)
     //{
@@ -134,70 +149,54 @@ _Use_decl_annotations_
 HRESULT StreamSink::ProcessSample(
     IMFSample *pSample)
 {
+	HRESULT hr = S_OK;
+	PayloadHandler handler = nullptr;
+	bool shouldDrop = false;
+
 	std::shared_lock<slim_mutex> slock(m_mutex);
 
-    IFR(CheckShutdown());
+    IFG(CheckShutdown(), done);
 
     if (State() == State::Paused || State() == State::Stopped)
     {
-        IFR(MF_E_INVALIDREQUEST);
+        IFG(MF_E_INVALIDREQUEST, done);
     }
 
-    if (State() == State::Eos) //drop
-    {
-        return S_OK;
+	IFG(ShouldDropSample(pSample, &shouldDrop), done);
+
+	if (!shouldDrop)
+	{
+		if (m_setDiscontinuity)
+		{
+			IFG(pSample->SetUINT32(MFSampleExtension_Discontinuity, TRUE), done);
+
+			m_setDiscontinuity = false;
+		}
+
+		handler = m_parentSink.PayloadHandler();
+		if (handler != nullptr)
+		{
+			winrtPayload payload = nullptr;
+			if (m_guidMajorType == MFMediaType_Audio)
+			{
+				IFG(AudioPayload::Create(m_mediaType.get(), pSample, payload), done);
+			}
+			else if (m_guidMajorType == MFMediaType_Video)
+			{
+				IFG(VideoPayload::Create(m_mediaType.get(), pSample, payload), done);
+			}
+
+			IFG(handler.QueuePayload(payload), done);
+		}
+	}
+
+done:
+    if (State() == State::Started && SUCCEEDED(hr))
+	{
+        hr = NotifyRequestSample();
     }
 
-    // if this is the first sample, calculate the offset from start timestamp
-    if (m_startTimeOffset == PRESENTATION_CURRENT_POSITION)
-    {
-        LONGLONG firstSampleTime = 0;
-        IFR(pSample->GetSampleTime(&firstSampleTime));
-
-        SetStartTimeOffset(firstSampleTime);
-    }
-
-    if (m_startTimeOffset > 0)
-    {
-        LONGLONG sampleTime = 0;
-        IFR(pSample->GetSampleTime(&sampleTime));
-
-        if (sampleTime < m_clockStartOffset) //we do not process samples predating the clock start offset;
-        {
-            return S_OK;
-        }
-
-        LONGLONG correctedSampleTime = sampleTime - m_startTimeOffset;
-        if (correctedSampleTime < 0)
-        {
-            correctedSampleTime = 0;
-        }
-
-        IFR(pSample->SetSampleTime(correctedSampleTime));
-    }
-
-    auto handler = m_parentSink.PayloadHandler();
-    if (handler != nullptr)
-    {
-        winrtPayload payload = nullptr;
-        if (m_guidMajorType == MFMediaType_Audio)
-        {
-            IFR(AudioPayload::Create(m_mediaType.get(), pSample, payload));
-        }
-        else if (m_guidMajorType == MFMediaType_Video)
-        {
-            IFR(VideoPayload::Create(m_mediaType.get(), pSample, payload));
-        }
-
-        IFR(handler.QueuePayload(payload));
-    }
-
-    if (State() == State::Started)
-    {
-        IFR(NotifyRequestSample());
-    }
-
-    return S_OK;
+    return hr;
 }
 
 _Use_decl_annotations_
@@ -539,11 +538,100 @@ HRESULT StreamSink::NotifyMarker(const PROPVARIANT *pVarContextValue)
 _Use_decl_annotations_
 HRESULT StreamSink::NotifyRequestSample()
 {
-    PROPVARIANT propVar;
-    PropVariantInit(&propVar);
-    propVar.vt = VT_EMPTY;
-    IFR(QueueEvent(MEStreamSinkRequestSample, GUID_NULL, S_OK, &propVar));
-    IFR(PropVariantClear(&propVar));
+	for (DWORD i = m_sampleRequests; i < m_cMaxSampleRequests; i++)
+	{
+		m_sampleRequests++;
+
+		IFR(QueueEvent(MEStreamSinkRequestSample, GUID_NULL, S_OK, NULL));
+	}
 
     return S_OK;
+}
+
+_Use_decl_annotations_
+HRESULT StreamSink::ShouldDropSample(
+	IMFSample* pSample,
+	bool *pDrop)
+{
+	NULL_CHK_HR(pSample, E_POINTER);
+	NULL_CHK_HR(pDrop, E_POINTER);
+
+	*pDrop = false;
+
+	HRESULT hr = S_OK;
+
+	LONGLONG timestamp = 0;
+	BOOL hasDecodeTime = false;
+	LONGLONG decodeTime = 0;
+	DWORD totalLength = 0;
+
+	// did we get a sample, even without requesting one
+	if (m_sampleRequests == 0 || State() == State::Eos)
+	{
+		*pDrop = true;
+
+		IFG(MF_E_NOTACCEPTING, done);
+	}
+
+	m_sampleRequests--;
+
+	IFG(pSample->GetSampleTime(&timestamp), done);
+
+	// if this is the first sample, calculate the offset from start timestamp
+	if (m_startTimeOffset == PRESENTATION_CURRENT_POSITION)
+	{
+		SetStartTimeOffset(timestamp);
+
+		if (m_startTimeOffset > 0)
+		{
+			Log(L"first sample is not at 0, ts=%I64d (m_startTimeOffset) timestamp=%I64d\n", m_startTimeOffset, timestamp);
+		}
+	}
+
+	if (FAILED(pSample->GetUINT64(MFSampleExtension_DecodeTimestamp, (QWORD*)&decodeTime)))
+	{
+		// No MFSampleExtension_DecodeTimestamp means DTS eaqual to PTS, using timestamp
+		if (timestamp <= m_lastDecodeTime)
+		{
+			Log(L"received sample with past timestamp, ts=%I64d (timestamp) m_lastDecodeTime=%I64d; dropping\n", timestamp, m_lastDecodeTime);
+			*pDrop = true;
+		}
+	}
+	else
+	{
+		hasDecodeTime = true;
+		Log(L"DTS exists, DTS=%I64d PTS=%I64d", decodeTime, timestamp);
+		if (decodeTime <= m_lastDecodeTime)
+		{
+			Log(L"received sample with past timestamp, ts=%I64d (decodeTime) m_lastDecodeTime=%I64d; dropping\n", decodeTime, m_lastDecodeTime);
+			*pDrop = true;
+		}
+	}
+
+	IFG(pSample->GetTotalLength(&totalLength), done);
+	if (0 == totalLength)
+	{
+		Log(L"received 0 length sample; dropping\n");
+		*pDrop = true;
+	}
+
+	if (*pDrop)
+	{
+		m_setDiscontinuity = true;
+	}
+	else
+	{
+		m_lastTimestamp = timestamp;
+		if (hasDecodeTime)
+		{
+			m_lastDecodeTime = decodeTime;
+		}
+		else
+		{
+			m_lastDecodeTime = timestamp;
+		}
+	}
+
+done:
+	return hr;
 }
