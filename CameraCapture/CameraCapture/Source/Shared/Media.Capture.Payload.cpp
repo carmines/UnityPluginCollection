@@ -4,48 +4,100 @@
 #include "pch.h"
 #include "Media.Capture.Payload.h"
 #include "Media.Capture.Payload.g.cpp"
+#include "Media.Functions.h"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
+using namespace Windows::Foundation;
+using namespace Windows::Foundation::Collections;
+using namespace Windows::Media::Core;
 using namespace Windows::Media::MediaProperties;
 
 
-// IPayloadPriv
-_Use_decl_annotations_
-HRESULT Payload::Initialize(
-    IMFMediaType* pType, 
-    IMFSample* pSample)
+Payload::Payload(Windows::Media::MediaProperties::IMediaEncodingProperties const& encodingProperties)
+	: m_mediaType(nullptr)
+	, m_mediaSample(nullptr)
+	, m_payloadType(PayloadType::Unknown)
+	, m_encodingProperties(encodingProperties)
 {
-    NULL_CHK_HR(pType, E_INVALIDARG);
-    NULL_CHK_HR(pSample, E_INVALIDARG);
-
-    IFR(pType->QueryInterface(__uuidof(IMFMediaType), m_mediaType.put_void()));
-    IFR(pSample->QueryInterface(__uuidof(IMFSample), m_mediaSample.put_void()));
-
-    IFR(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), reinterpret_cast<void**>(put_abi(m_encodingProperties))));
-
-    return S_OK;
+	if (_wcsicmp(m_encodingProperties.Type().c_str(), L"Audio") == 0)
+	{
+		m_payloadType = PayloadType::Audio;
+	}
+	else if (_wcsicmp(m_encodingProperties.Type().c_str(), L"Video") == 0)
+	{
+		m_payloadType = PayloadType::Video;
+	}
+	else if (_wcsicmp(m_encodingProperties.Type().c_str(), L"Container") == 0)
+	{
+		m_payloadType = PayloadType::Data;
+	}
 }
 
-_Use_decl_annotations_
-IMFSample* Payload::Sample()
-{ 
-    return m_mediaSample.get(); 
-}
-
-_Use_decl_annotations_
-HRESULT Payload::Sample(
-    IMFSample* pSample)
+CameraCapture::Media::Capture::PayloadType Payload::Type()
 {
-    NULL_CHK_HR(pSample, E_INVALIDARG);
+	return m_payloadType;
+}
 
-    IFR(pSample->QueryInterface(__uuidof(IMFSample), m_mediaSample.put_void()));
+IMediaEncodingProperties Payload::EncodingProperties()
+{
+	return m_encodingProperties;
+}
 
-    return S_OK;
+Windows::Media::Core::MediaStreamSample Payload::MediaStreamSample()
+{
+	com_ptr<IMFMediaBuffer> spMediaBuffer;
+	IFT(m_mediaSample->ConvertToContiguousBuffer(spMediaBuffer.put()));
+
+	Windows::Storage::Streams::IBuffer sampleBuffer = nullptr;
+
+	DWORD dwLength;
+	BYTE *pbBuffer = nullptr;
+	if (SUCCEEDED(spMediaBuffer->Lock(&pbBuffer, nullptr, &dwLength)))
+	{
+		sampleBuffer = make<CustomBuffer>(dwLength);
+		auto spBufferByteAccess = sampleBuffer.as<IBufferByteAccess>();
+
+		BYTE *pbRawIBuffer;
+		if SUCCEEDED(spBufferByteAccess->Buffer(&pbRawIBuffer))
+		{
+			CopyMemory(pbRawIBuffer, pbBuffer, dwLength);
+
+			sampleBuffer.Length(dwLength);
+		}
+
+		IFT(spMediaBuffer->Unlock());
+	}
+
+	LONGLONG llSampleTime;
+	IFT(m_mediaSample->GetSampleTime(&llSampleTime));
+
+	LONGLONG llSampleDuration = 0;
+	IFT(m_mediaSample->GetSampleDuration(&llSampleDuration));
+
+	auto sample = MediaStreamSample::CreateFromBuffer(sampleBuffer, Windows::Foundation::TimeSpan(llSampleTime));
+	IFT(sample == nullptr ? E_OUTOFMEMORY: S_OK);
+
+	IFT(CopyAttributesToMediaStreamSample(m_mediaSample, sample));
+
+	if (llSampleDuration != 0)
+	{
+		sample.Duration(Windows::Foundation::TimeSpan(llSampleDuration));
+	}
+
+	return sample;
 }
 
 _Use_decl_annotations_
-IMediaEncodingProperties Payload::MediaEncodingProperties()
+com_ptr<IMFSample> Payload::Sample()
 { 
-    return m_encodingProperties; 
+	 return m_mediaSample; 
+}
+
+_Use_decl_annotations_
+hresult Payload::Sample(IMFSample* pSample)
+{
+	m_mediaSample.copy_from(pSample);
+
+	return S_OK;
 }

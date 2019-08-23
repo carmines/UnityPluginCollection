@@ -11,9 +11,10 @@
 using namespace winrt;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Devices::Enumeration;
-using namespace winrt::Windows::Media::MediaProperties;
-using namespace winrt::Windows::Media::Devices;
 using namespace winrt::Windows::Media::Capture;
+using namespace winrt::Windows::Media::Core;
+using namespace winrt::Windows::Media::Devices;
+using namespace winrt::Windows::Media::MediaProperties;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
 
 // Check for SDK Layer support.
@@ -234,13 +235,59 @@ HRESULT GetSurfaceFromTexture(
 }
 
 _Use_decl_annotations_
+MediaStreamSource CreateMediaSource(
+	MediaEncodingProfile const& encodingProfile)
+{
+	AudioStreamDescriptor audioStreamDescriptor = nullptr;
+	VideoStreamDescriptor videoStreamDescriptor = nullptr;
+	MediaStreamSource mediaStreamSource = nullptr;
+
+	if (encodingProfile.Audio() != nullptr)
+	{
+		audioStreamDescriptor = AudioStreamDescriptor(encodingProfile.Audio());
+	}
+
+	if (encodingProfile.Video() != nullptr)
+	{
+		videoStreamDescriptor = VideoStreamDescriptor(encodingProfile.Video());
+	}
+
+	if (audioStreamDescriptor != nullptr)
+	{
+		if (videoStreamDescriptor != nullptr)
+		{
+			mediaStreamSource = MediaStreamSource(videoStreamDescriptor, audioStreamDescriptor);
+		}
+		else
+		{
+			mediaStreamSource = MediaStreamSource(audioStreamDescriptor);
+		}
+	}
+	else if (videoStreamDescriptor != nullptr)
+	{
+		mediaStreamSource = MediaStreamSource(videoStreamDescriptor);
+	}
+
+	return mediaStreamSource;
+}
+
+_Use_decl_annotations_
 HRESULT CopySample(
     GUID majorType,
-    IMFSample *srcSample,
-    IMFSample *dstSample)
+    com_ptr<IMFSample> const& srcSample,
+	com_ptr<IMFSample> const& dstSample)
 {
     NULL_CHK_HR(srcSample, E_INVALIDARG);
     NULL_CHK_HR(dstSample, E_INVALIDARG);
+
+    // copy sample attributes
+    com_ptr<IMFAttributes> srcAttributes = nullptr;
+    IFR(srcSample->QueryInterface(__uuidof(IMFAttributes), srcAttributes.put_void()));
+
+    com_ptr<IMFAttributes> dstAttributes = nullptr;
+    IFR(dstSample->QueryInterface(__uuidof(IMFAttributes), dstAttributes.put_void()));
+
+    IFR(srcAttributes->CopyAllItems(dstAttributes.get()));
 
     // get the sample time, duration and flags
     LONGLONG sampleTime = 0;
@@ -251,15 +298,6 @@ HRESULT CopySample(
 
     DWORD sampleFlags = 0;
     IFR(srcSample->GetSampleFlags(&sampleFlags));
-
-    // copy sample attributes
-    com_ptr<IMFAttributes> srcAttributes = nullptr;
-    IFR(srcSample->QueryInterface(__uuidof(IMFAttributes), srcAttributes.put_void()));
-
-    com_ptr<IMFAttributes> dstAttributes = nullptr;
-    IFR(dstSample->QueryInterface(__uuidof(IMFAttributes), dstAttributes.put_void()));
-
-    IFR(srcAttributes->CopyAllItems(dstAttributes.get()));
 
     // set time, duration and flags
     IFR(dstSample->SetSampleTime(sampleTime));
@@ -314,3 +352,130 @@ HRESULT CopySample(
 
     return S_OK;
 }
+
+template <typename T>
+winrt::array_view<const T> from_safe_array(LPSAFEARRAY const& safeArray)
+{
+	auto start = reinterpret_cast<T*>(safeArray->pvData);
+	auto end = start + safeArray->cbElements;
+	return winrt::array_view<const T>(start, end);
+}
+
+inline winrt::Windows::Foundation::IInspectable ConvertProperty(PROPVARIANT const& var)
+{
+	switch (var.vt)
+	{
+	case VT_BOOL:
+		return PropertyValue::CreateBoolean(var.boolVal);
+		break;
+	case VT_I1:
+		return PropertyValue::CreateChar16(var.cVal);
+		break;
+	case VT_UI1:
+		return PropertyValue::CreateUInt8(var.bVal);
+		break;
+	case VT_I2:
+		return PropertyValue::CreateInt16(var.iVal);
+		break;
+	case VT_UI2:
+		return PropertyValue::CreateUInt16(var.uiVal);
+		break;
+	case VT_I4:
+	case VT_INT:
+		return PropertyValue::CreateInt32(var.lVal);
+		break;
+	case VT_UI4:
+	case VT_UINT:
+		return PropertyValue::CreateInt32(var.lVal);
+		break;
+	case VT_I8:
+		return PropertyValue::CreateInt64(var.hVal.QuadPart);
+		break;
+	case VT_UI8:
+		return PropertyValue::CreateUInt64(var.uhVal.QuadPart);
+		break;
+	case VT_R4:
+		return PropertyValue::CreateSingle(var.fltVal);
+		break;
+	case VT_R8:
+		return PropertyValue::CreateDouble(var.dblVal);
+		break;
+	case VT_LPWSTR:
+		return PropertyValue::CreateString(var.pwszVal);
+		break;
+	case VT_ARRAY | VT_BOOL:
+		return PropertyValue::CreateBooleanArray(from_safe_array<bool>(var.parray));
+		break;
+	case VT_ARRAY | VT_I1:
+		return PropertyValue::CreateChar16Array(from_safe_array<char16_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_UI1:
+		return PropertyValue::CreateUInt8Array(from_safe_array<uint8_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_I2:
+		return PropertyValue::CreateInt16Array(from_safe_array<int16_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_UI2:
+		return PropertyValue::CreateUInt16Array(from_safe_array<uint16_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_I4:
+	case VT_ARRAY | VT_INT:
+		return PropertyValue::CreateInt32Array(from_safe_array<int32_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_UI4:
+	case VT_ARRAY | VT_UINT:
+		return PropertyValue::CreateUInt32Array(from_safe_array<uint32_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_I8:
+		return PropertyValue::CreateInt64Array(from_safe_array<int64_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_UI8:
+		return PropertyValue::CreateUInt64Array(from_safe_array<uint64_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_R4:
+		return PropertyValue::CreateSingleArray(from_safe_array<float_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_R8:
+		return PropertyValue::CreateDoubleArray(from_safe_array<double_t>(var.parray));
+		break;
+	case VT_ARRAY | VT_LPWSTR:
+		return PropertyValue::CreateStringArray(from_safe_array<hstring>(var.parray));
+		break;
+	}
+
+	return nullptr;
+}
+
+HRESULT CopyAttributesToMediaStreamSample(
+	com_ptr<IMFAttributes> const& attributes,
+	MediaStreamSample const& sample)
+{
+	UINT32 cAttributes;
+	IFR(attributes->GetCount(&cAttributes));
+
+	auto propertySet = sample.ExtendedProperties();
+
+	PROPVARIANT propVar = {};
+	for (UINT32 unIndex = 0; unIndex < cAttributes; ++unIndex)
+	{
+		PropVariantClear(&propVar);
+
+		GUID guidAttributeKey;
+		IFR(attributes->GetItemByIndex(unIndex, &guidAttributeKey, &propVar));
+
+		auto value = ConvertProperty(propVar);
+		if (value != nullptr)
+		{
+			auto wrapper = propertySet.TryLookup(guidAttributeKey);
+			if (wrapper == nullptr)
+			{
+				propertySet.Insert(guidAttributeKey, value);
+			}
+		}
+	}
+
+	PropVariantClear(&propVar);
+
+	return S_OK;
+}
+

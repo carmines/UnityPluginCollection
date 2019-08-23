@@ -5,18 +5,16 @@ public class CameraVisualizer : MonoBehaviour
 {
     public SpatialCameraTracker cameraTracker = null;
 
-    public LineRenderer imgbounds = null;
-    public Transform[] corners = null;
-    public Transform targetTransform = null;
+    public Transform cameraOffsetRoot = null;
+    public LineRenderer cameraBorder = null;
+    public Transform[] cornerMarkers = null;
 
     private Camera cameraCache = null;
+    private Vector3 startPosition;
 
     private void Awake()
     {
-        if (cameraCache == null)
-        {
-            cameraCache = Camera.main;
-        }
+        cameraCache = Camera.main;
 
         if (cameraTracker == null)
         {
@@ -31,40 +29,44 @@ public class CameraVisualizer : MonoBehaviour
             return;
         }
 
-        if (imgbounds != null && imgbounds.positionCount != 4)
+        if (cameraBorder != null && cameraBorder.positionCount != 4)
         {
-            imgbounds.positionCount = 4;
+            cameraBorder.positionCount = 4;
         }
+    }
+
+    private void OnEnable()
+    {
+        startPosition = transform.position;
     }
 
     private void Update()
     {
+        // increase nearplane size
+        float smooth = Time.deltaTime * 10.0f;
+
+        // update the offset from main camera to pv camera
+        if (cameraTracker != null && cameraOffsetRoot != null)
+        {
+            Vector3 mainCameraPos = cameraCache.transform.position;
+            Vector3 worldOffset = cameraTracker.transform.position - mainCameraPos;
+
+            cameraOffsetRoot.position = Vector3.Lerp(cameraOffsetRoot.position, startPosition + worldOffset, smooth);
+        }
+
+        // update corner verticies
         if (cameraTracker.ImageCorners == null)
         {
             return;
         }
 
-        // increase nearplane size
-        float smooth = Time.deltaTime * 10.0f;
-        Vector3 cameraPos = cameraTracker.transform.position;
-
-        // update the offset from main camera to spatial camera
-        if (targetTransform != null)
-        {
-            Vector3 mainCameraPos = cameraCache.transform.position;
-            Vector3 mainToSpatialOffset = cameraPos - mainCameraPos;
-
-            targetTransform.localPosition = Vector3.Lerp(targetTransform.localPosition, mainToSpatialOffset, smooth);
-        }
-
-        // update corner verticies
         for (int i = 0; i < 4; i++)
         {
-            imgbounds.SetPosition(i, targetTransform.localPosition + cameraTracker.ImageCorners[i]);
+            cameraBorder.SetPosition(i, cameraTracker.ImageCorners[i]);
 
-            if (i < corners.Length)
+            if (i < cornerMarkers.Length)
             {
-                corners[i].localPosition = imgbounds.GetPosition(i);
+                cornerMarkers[i].localPosition = cameraBorder.GetPosition(i);
             }
         }
     }

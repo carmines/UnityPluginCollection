@@ -100,7 +100,7 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         void SetStartTimeOffset(
             _In_ LONGLONG firstSampleTime)
         {
-            if (firstSampleTime < m_clockStartOffset) //we do not process samples predating the clock start offset;
+            if (firstSampleTime < m_clockStartOffset) // do not process samples predating the clock start offset;
             {
                 return;
             }

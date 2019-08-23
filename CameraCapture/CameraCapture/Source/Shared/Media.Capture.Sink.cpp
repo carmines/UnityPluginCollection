@@ -13,6 +13,7 @@ using winrtStreamSink = CameraCapture::Media::Capture::StreamSink;
 
 Sink::Sink(MediaEncodingProfile const& encodingProfile)
     : m_currentState(State::Ready)
+	, m_mediaEncodingProfile(encodingProfile)
     , m_streamSinks()
     , m_payloadHandler(nullptr)
 {

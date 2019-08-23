@@ -67,6 +67,7 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         Capture::State State() { return m_currentState; }
         Capture::PayloadHandler PayloadHandler() { return m_payloadHandler; }
         void PayloadHandler(Capture::PayloadHandler const& value) { m_payloadHandler = value; }
+		Windows::Media::MediaProperties::MediaEncodingProfile EncodingProfile() { return m_mediaEncodingProfile; }
 
     private:
         void Reset();
@@ -94,6 +95,7 @@ namespace winrt::CameraCapture::Media::Capture::implementation
 		slim_mutex m_mutex;
 		std::atomic<Capture::State> m_currentState;
 
+		Windows::Media::MediaProperties::MediaEncodingProfile m_mediaEncodingProfile;
         std::list<com_ptr<IMFStreamSink>> m_streamSinks;
         com_ptr<IMFPresentationClock> m_presentationClock;
 

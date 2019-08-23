@@ -27,8 +27,8 @@ EXTERN_GUID(MFSampleExtension_Spatial_CameraProjectionTransform, 0x47f9fcb5, 0x2
 #endif
 
 HRESULT SharedTexture::Create(
-    ID3D11Device* d3dDevice,
-    IMFDXGIDeviceManager* dxgiDeviceManager,
+    com_ptr<ID3D11Device> const& d3dDevice,
+	com_ptr<IMFDXGIDeviceManager> const& dxgiDeviceManager,
     uint32_t width, uint32_t height,
     com_ptr<SharedTexture>& sharedTexture)
 {
@@ -116,8 +116,7 @@ done:
 
     dxgiDeviceManager->UnlockDevice(deviceHandle, FALSE);
 
-
-    return hr;
+	return hr;
 }
 
 SharedTexture::SharedTexture()

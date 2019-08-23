@@ -13,11 +13,54 @@
 #include <winrt/base.h>
 #include <winrt/windows.foundation.h>
 #include <winrt/windows.foundation.collections.h>
+#include <winrt/Windows.storage.streams.h>
 
 #include <windows.h>
 #include <strsafe.h>
 
 #pragma comment(lib, "mfuuid")
+
+struct __declspec(uuid("905a0fef-bc53-11df-8c49-001e4fc686da")) IBufferByteAccess : ::IUnknown
+{
+	virtual HRESULT __stdcall Buffer(uint8_t** value) = 0;
+};
+
+struct CustomBuffer : winrt::implements<CustomBuffer, winrt::Windows::Storage::Streams::IBuffer, ::IBufferByteAccess>
+{
+	std::vector<uint8_t> m_buffer;
+	uint32_t m_length{};
+
+	CustomBuffer(uint32_t size) :
+		m_buffer(size)
+	{
+	}
+
+	uint32_t Capacity() const
+	{
+		return m_buffer.size();
+	}
+
+	uint32_t Length() const
+	{
+		return m_length;
+	}
+
+	void Length(uint32_t value)
+	{
+		if (value > m_buffer.size())
+		{
+			throw winrt::hresult_invalid_argument();
+		}
+
+		m_length = value;
+	}
+
+	HRESULT __stdcall Buffer(uint8_t** value) final
+	{
+		*value = m_buffer.data();
+		return S_OK;
+	}
+};
 
 inline void __stdcall Log(
     _In_ _Printf_format_string_ STRSAFE_LPCWSTR pszFormat,

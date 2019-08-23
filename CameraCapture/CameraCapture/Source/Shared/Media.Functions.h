@@ -11,6 +11,7 @@
 #include <winrt/windows.media.devices.h>
 #include <winrt/windows.media.mediaproperties.h>
 #include <winrt/windows.media.capture.h>
+#include <winrt/windows.media.core.h>
 #include <winrt/windows.graphics.directx.direct3d11.h>
 
 HRESULT CreateMediaDevice(
@@ -27,11 +28,18 @@ winrt::Windows::Media::MediaProperties::IMediaEncodingProperties GetVideoDeviceP
     _In_ uint32_t height,
     _In_ winrt::hstring subType);
 
+winrt::Windows::Media::Core::MediaStreamSource CreateMediaSource(
+	_In_ winrt::Windows::Media::MediaProperties::MediaEncodingProfile const& encodingProfile);
+
+HRESULT CopyAttributesToMediaStreamSample(
+	winrt::com_ptr<IMFAttributes> const& attributes,
+	winrt::Windows::Media::Core::MediaStreamSample const& sample);
+
 HRESULT GetSurfaceFromTexture(
     _In_ ID3D11Texture2D* pTexture,
     _Out_ winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DSurface& ppSurface);
 
 HRESULT CopySample(
     _In_ GUID majorType,
-    _In_ IMFSample* srcSample,
-    _In_ IMFSample* dstSample);
+    _In_ winrt::com_ptr<IMFSample> const& srcSample,
+    _In_ winrt::com_ptr<IMFSample> const& dstSample);

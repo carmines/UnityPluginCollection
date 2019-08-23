@@ -166,13 +166,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraTracker: {fileID: 1159816481}
-  imgbounds: {fileID: 352800086}
-  corners:
+  cameraOffsetRoot: {fileID: 811886037}
+  cameraBorder: {fileID: 352800086}
+  cornerMarkers:
   - {fileID: 2062495141}
   - {fileID: 2121083031}
   - {fileID: 862321682}
   - {fileID: 1401073969}
-  targetTransform: {fileID: 811886037}
 --- !u!1 &325282660
 GameObject:
   m_ObjectHideFlags: 0
@@ -261,7 +261,7 @@ GameObject:
   - component: {fileID: 352800085}
   - component: {fileID: 352800086}
   m_Layer: 0
-  m_Name: Bounds
+  m_Name: Border
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -406,7 +406,7 @@ Transform:
   m_Children:
   - {fileID: 1932517925}
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &603069613
 MonoBehaviour:
@@ -437,7 +437,7 @@ GameObject:
   m_Component:
   - component: {fileID: 811886037}
   m_Layer: 0
-  m_Name: SpatialCameraRoot
+  m_Name: CameraRoot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -626,7 +626,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 1
   m_LocalEulerAnglesHint: {x: 50, y: -30, z: 0}
 --- !u!1 &1048300264
 GameObject:
@@ -746,7 +746,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 1
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1401073968
 GameObject:

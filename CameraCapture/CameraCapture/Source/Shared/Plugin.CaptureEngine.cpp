@@ -26,7 +26,7 @@ using namespace Windows::Media::MediaProperties;
 using winrtCaptureEngine = CameraCapture::Plugin::CaptureEngine;
 
 _Use_decl_annotations_
-CameraCapture::Plugin::IModule CaptureEngine::Create(
+CameraCapture::Plugin::Module CaptureEngine::Create(
     std::weak_ptr<IUnityDeviceResource> const& unityDevice,
     StateChangedCallback fnCallback,
     void* pCallbackObject)
@@ -76,15 +76,11 @@ void CaptureEngine::Shutdown()
     if (m_startPreviewOp != nullptr)
     {
         m_startPreviewOp.Cancel();
-
-        m_startPreviewOp = nullptr;
     }
 
     if (m_stopPreviewOp != nullptr)
     {
         m_stopPreviewOp.Cancel();
-
-        m_stopPreviewOp = nullptr;
     }
 
     if (m_mediaCapture != nullptr)
@@ -106,24 +102,28 @@ void CaptureEngine::Shutdown()
     Module::Shutdown();
 }
 
-HRESULT CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc)
+hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc)
 {
-    auto guard = slim_lock_guard(m_mutex);
+	std::unique_lock<slim_mutex> slock(m_mutex);
 
-    if (m_mediaCapture != nullptr)
-    {
-        IFR(MF_E_ALREADY_INITIALIZED);
-    }
+	if (m_mediaCapture != nullptr)
+	{
+		IFR(MF_E_ALREADY_INITIALIZED);
+	}
 
-    if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
-    {
-        IFR(MF_E_MULTIPLE_BEGIN);
-    }
+	if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
+	{
+		IFR(MF_E_MULTIPLE_BEGIN);
+	}
 
-    m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([=](auto const asyncOp, AsyncStatus const status)
+	IFR(CreateDeviceResources());
+
+	m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
+    m_startPreviewOp.Completed([this](auto const asyncOp, AsyncStatus const status)
     {
         UNREFERENCED_PARAMETER(asyncOp);
+
+        m_startPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
@@ -142,28 +142,28 @@ HRESULT CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 
             Callback(state);
         }
-
-        m_startPreviewOp = nullptr;
     });
 
     return S_OK;
 }
 
-HRESULT CaptureEngine::StopPreview()
+hresult CaptureEngine::StopPreview()
 {
-    auto guard = slim_lock_guard(m_mutex);
+	std::unique_lock<slim_mutex> slock(m_mutex);
 
-    NULL_CHK_HR(m_mediaCapture, S_OK);
+	NULL_CHK_HR(m_mediaCapture, S_OK);
 
-    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
-    {
-        IFR(MF_E_MULTIPLE_BEGIN);
-    }
+	if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+	{
+		IFR(MF_E_MULTIPLE_BEGIN);
+	}
 
     m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([=](auto const asyncOp, AsyncStatus const status)
+    m_stopPreviewOp.Completed([this](auto const asyncOp, AsyncStatus const status)
     {
         UNREFERENCED_PARAMETER(asyncOp);
+
+        m_stopPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
@@ -182,15 +182,13 @@ HRESULT CaptureEngine::StopPreview()
 
             Callback(state);
         }
-
-        m_stopPreviewOp = nullptr;
     });
 
     return S_OK;
 }
 
 // private
-HRESULT CaptureEngine::CreateDeviceResources()
+hresult CaptureEngine::CreateDeviceResources()
 {
     if (m_d3dDevice != nullptr && m_dxgiDeviceManager != nullptr)
     {
@@ -251,38 +249,215 @@ void CaptureEngine::ReleaseDeviceResources()
 }
 
 
+CameraCapture::Media::Capture::Sink CaptureEngine::MediaSink()
+{
+	return m_mediaSink;
+}
+
+CameraCapture::Media::Capture::PayloadHandler CaptureEngine::PayloadHandler()
+{
+	return m_payloadHandler;
+}
+void CaptureEngine::PayloadHandler(CameraCapture::Media::Capture::PayloadHandler const& value)
+{
+	std::unique_lock<slim_mutex> slock(m_mutex);
+
+	if (m_payloadHandler != nullptr)
+	{
+		m_payloadHandler.OnSample(m_sampleEventToken);
+
+		m_payloadHandler = nullptr;
+	}
+
+	m_payloadHandler = value;
+
+	if (m_mediaSink != nullptr)
+	{
+		m_mediaSink.PayloadHandler(m_payloadHandler);
+	}
+
+	m_sampleEventToken = m_payloadHandler.OnSample([this](auto const sender, Media::Capture::Payload const payload)
+		{
+			UNREFERENCED_PARAMETER(sender);
+
+			std::shared_lock<slim_mutex> slock(m_mutex);
+
+			if (m_isShutdown)
+			{
+				return;
+			}
+
+			if (sender != m_payloadHandler)
+			{
+				return;
+			}
+
+			if (payload == nullptr)
+			{
+				return;
+			}
+
+			//auto mediaStreamSample = payload.MediaStreamSample();
+			//if (mediaStreamSample == nullptr)
+			//{
+			//	return;
+			//}
+
+			auto streamSample = payload.as<IStreamSample>();
+			if (streamSample == nullptr)
+			{
+				return;
+			}
+
+			if (L"Audio" == payload.EncodingProperties().Type())
+			{
+				if (m_audioSample == nullptr)
+				{
+					DWORD bufferSize = 0;
+					IFV(streamSample->Sample()->GetTotalLength(&bufferSize));
+
+					com_ptr<IMFMediaBuffer> dstBuffer = nullptr;
+					IFV(MFCreateMemoryBuffer(bufferSize, dstBuffer.put()));
+
+					com_ptr<IMFSample> dstSample = nullptr;
+					IFV(MFCreateSample(dstSample.put()));
+
+					IFV(dstSample->AddBuffer(dstBuffer.get()));
+
+					m_audioSample.attach(dstSample.detach());
+				}
+
+				IFV(CopySample(MFMediaType_Audio, streamSample->Sample(), m_audioSample));
+
+				CALLBACK_STATE state{};
+				ZeroMemory(&state, sizeof(CALLBACK_STATE));
+
+				state.type = CallbackType::Capture;
+
+				ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
+
+				state.value.captureState.stateType = CaptureStateType::PreviewAudioFrame;
+				//state.value.captureState.width = 0;
+				//state.value.captureState.height = 0;
+				//state.value.captureState.texturePtr = nullptr;
+				Callback(state);
+			}
+			else if (L"Video" == payload.EncodingProperties().Type())
+			{
+				boolean bufferChanged = false;
+
+				auto videoProps = payload.EncodingProperties().as<IVideoEncodingProperties>();
+
+				if (m_videoBuffer == nullptr
+					||
+					m_videoBuffer->frameTexture == nullptr
+					||
+					m_videoBuffer->frameTextureDesc.Width != videoProps.Width()
+					||
+					m_videoBuffer->frameTextureDesc.Height != videoProps.Height())
+				{
+					auto resources = m_d3d11DeviceResources.lock();
+					NULL_CHK_R(resources);
+
+					// make sure we have created our own d3d device
+					IFV(CreateDeviceResources());
+
+					IFV(SharedTexture::Create(resources->GetDevice(), m_dxgiDeviceManager, videoProps.Width(), videoProps.Height(), m_videoBuffer));
+
+					bufferChanged = true;
+				}
+
+				// copy the data
+				IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_videoBuffer->mediaSample));
+
+				// did the texture description change, if so, raise callback
+				CALLBACK_STATE state{};
+				ZeroMemory(&state, sizeof(CALLBACK_STATE));
+
+				state.type = CallbackType::Capture;
+
+				ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
+
+				state.value.captureState.stateType = CaptureStateType::PreviewVideoFrame;
+				state.value.captureState.width = m_videoBuffer->frameTextureDesc.Width;
+				state.value.captureState.height = m_videoBuffer->frameTextureDesc.Height;
+				state.value.captureState.texturePtr = m_videoBuffer->frameTextureSRV.get();
+
+				// if there is transform change, update matricies
+				if (m_appCoordinateSystem != nullptr)
+				{
+					if (SUCCEEDED(m_videoBuffer->UpdateTransforms(m_appCoordinateSystem)))
+					{
+						state.value.captureState.worldMatrix = m_videoBuffer->cameraToWorldTransform;
+						state.value.captureState.projectionMatrix = m_videoBuffer->cameraProjectionMatrix;
+
+						bufferChanged = true;
+					}
+				}
+
+				if (bufferChanged)
+				{
+					Callback(state);
+				}
+			}
+			else if (L"Container" == payload.EncodingProperties().Type())
+			{
+
+			}
+		});
+}
+
+Windows::Perception::Spatial::SpatialCoordinateSystem CaptureEngine::AppCoordinateSystem()
+{
+	return m_appCoordinateSystem;
+}
+void CaptureEngine::AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value)
+{
+	m_appCoordinateSystem = value;
+}
+
+
 IAsyncAction CaptureEngine::StartPreviewCoroutine(
     uint32_t const width, uint32_t const height,
     boolean const enableAudio, boolean const enableMrc)
 {
-    // make sure this is on the calling thread
-    IFT(CreateDeviceResources());
-
+	MediaCapture mediaCapture = nullptr;
+	Windows::Media::Devices::VideoDeviceController videoController = nullptr;
+	MediaCaptureSharingMode sharingMode = MediaCaptureSharingMode::SharedReadOnly;
+	MediaStreamType streamType = MediaStreamType::VideoPreview;
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
 
-    if (m_mediaCapture == nullptr)
-    {
-        co_await CreateMediaCaptureAsync(enableAudio, width, height);
-    }
-    else
-    {
-        co_await RemoveMrcEffectsAsync();
-    }
+	{
+		std::unique_lock<slim_mutex> slock(m_mutex);
 
-	// set video controller properties
-	auto videoController = m_mediaCapture.VideoDeviceController();
-	videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
+		if (m_mediaCapture == nullptr)
+		{
+			co_await CreateMediaCaptureAsync(enableAudio, width, height);
+		}
+		else
+		{
+			co_await RemoveMrcEffectsAsync();
+		}
+
+		mediaCapture = m_mediaCapture;
+		sharingMode = m_initSettings.SharingMode();
+		streamType = m_streamType;
+
+		// set video controller properties
+		videoController = mediaCapture.VideoDeviceController();
+		videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
+	}
 
 	// override video controller media stream properties
-	if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
+	if (sharingMode == MediaCaptureSharingMode::ExclusiveControl)
 	{
-		auto videoEncProps = GetVideoDeviceProperties(videoController, m_streamType, width, height, MediaEncodingSubtypes::Nv12());
-		co_await videoController.SetMediaStreamPropertiesAsync(m_streamType, videoEncProps);
+		auto videoEncProps = GetVideoDeviceProperties(videoController, streamType, width, height, MediaEncodingSubtypes::Nv12());
+		co_await videoController.SetMediaStreamPropertiesAsync(streamType, videoEncProps);
 
-		auto captureSettings = m_mediaCapture.MediaCaptureSettings();
-		if (m_streamType != MediaStreamType::VideoPreview
+		auto captureSettings = mediaCapture.MediaCaptureSettings();
+		if (streamType != MediaStreamType::VideoPreview
 			&&
 			captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::AllStreamsIdentical
 			&&
@@ -308,7 +483,7 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 		encodingProfile.Audio().BitsPerSample(audioMediaProperty.BitsPerSample());
 		encodingProfile.Audio().ChannelCount(audioMediaProperty.ChannelCount());
 		encodingProfile.Audio().SampleRate(audioMediaProperty.SampleRate());
-		if (m_streamType == MediaStreamType::VideoPreview) // for local playback only
+		if (streamType == MediaStreamType::VideoPreview) // for local playback only
 		{
 			encodingProfile.Audio().Subtype(MediaEncodingSubtypes::Float());
 		}
@@ -318,17 +493,18 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 		encodingProfile.Audio(nullptr);
 	}
 
-    auto videoMediaProperty = videoController.GetMediaStreamProperties(m_streamType).as<VideoEncodingProperties>();
+    auto videoMediaProperty = videoController.GetMediaStreamProperties(streamType).as<VideoEncodingProperties>();
     if (videoMediaProperty != nullptr)
     {
         encodingProfile.Video().Width(videoMediaProperty.Width());
         encodingProfile.Video().Height(videoMediaProperty.Height());
-        if (m_streamType == MediaStreamType::VideoPreview) // for local playback only
+        if (streamType == MediaStreamType::VideoPreview) // for local playback only
         {
             encodingProfile.Video().Subtype(MediaEncodingSubtypes::Bgra8());
         }
     }
 
+	//encodingProfile.Video().Bitrate = (unsigned int)(fps * width * height * 4);
     // media sink
     auto mediaSink = make<Sink>(encodingProfile);
 
@@ -349,180 +525,58 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
         auto previewFrame = co_await m_mediaCapture.GetPreviewFrameAsync();
     }
 
-    // payload handler
-    auto payloadHandler = make<PayloadHandler>();
-    mediaSink.PayloadHandler(payloadHandler);
-
-	std::lock_guard<slim_mutex> guard(m_mutex);
-
     // store locals
-    m_mediaSink = mediaSink;
-    m_payloadHandler = payloadHandler;
+	{
+		std::unique_lock<slim_mutex> slock(m_mutex);
+		m_mediaSink = mediaSink;
+		if (m_payloadHandler != nullptr)
+		{
+			m_mediaSink.PayloadHandler(m_payloadHandler);
+		}
+	}
 
     co_await calling_thread; // switch back to calling context
-
-    m_sampleEventToken = m_payloadHandler.OnSample([this](auto const& sender, Media::Capture::Payload const& payload)
-    {
-        UNREFERENCED_PARAMETER(sender);
-
-		std::shared_lock<slim_mutex> slock(m_mutex);
-
-        if (m_isShutdown)
-        {
-            return;
-        }
-		
-		if (payload == nullptr)
-		{
-			return;
-		}
-
-        auto streamSample = payload.as<IStreamSample>();
-        if (streamSample == nullptr)
-        {
-            return;
-        }
-
-        if (L"Audio" == payload.MediaEncodingProperties().Type())
-        {
-            if (m_audioSample == nullptr)
-            {
-                DWORD bufferSize = 0;
-                IFV(streamSample->Sample()->GetTotalLength(&bufferSize));
-
-                com_ptr<IMFMediaBuffer> dstBuffer = nullptr;
-                IFV(MFCreateMemoryBuffer(bufferSize, dstBuffer.put()));
-
-                com_ptr<IMFSample> dstSample = nullptr;
-                IFV(MFCreateSample(dstSample.put()));
-
-                IFV(dstSample->AddBuffer(dstBuffer.get()));
-
-                m_audioSample.attach(dstSample.detach());
-            }
-
-            IFV(CopySample(MFMediaType_Audio, streamSample->Sample(), m_audioSample.get()));
-
-            CALLBACK_STATE state{};
-            ZeroMemory(&state, sizeof(CALLBACK_STATE));
-
-            state.type = CallbackType::Capture;
-
-            ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
-
-            state.value.captureState.stateType = CaptureStateType::PreviewAudioFrame;
-            //state.value.captureState.width = 0;
-            //state.value.captureState.height = 0;
-            //state.value.captureState.texturePtr = nullptr;
-            Callback(state);
-        }
-        else if (L"Video" == payload.MediaEncodingProperties().Type())
-        {
-            boolean bufferChanged = false;
-
-            auto videoProps = payload.MediaEncodingProperties().as<IVideoEncodingProperties>();
-
-            if (m_videoBuffer == nullptr
-                ||
-                m_videoBuffer->frameTexture == nullptr
-                ||
-                m_videoBuffer->frameTextureDesc.Width != videoProps.Width()
-                ||
-                m_videoBuffer->frameTextureDesc.Height != videoProps.Height())
-            {
-				auto resources = m_d3d11DeviceResources.lock();
-				NULL_CHK_R(resources);
-
-				// make sure we have created our own d3d device
-				IFV(CreateDeviceResources());
-
-				IFV(SharedTexture::Create(resources->GetDevice().get(), m_dxgiDeviceManager.get(), videoProps.Width(), videoProps.Height(), m_videoBuffer));
-
-                bufferChanged = true;
-            }
-
-            // copy the data
-            IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_videoBuffer->mediaSample.get()));
-
-            // did the texture description change, if so, raise callback
-            CALLBACK_STATE state{};
-            ZeroMemory(&state, sizeof(CALLBACK_STATE));
-            
-            state.type = CallbackType::Capture;
-            
-            ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
-
-            state.value.captureState.stateType = CaptureStateType::PreviewVideoFrame;
-            state.value.captureState.width = m_videoBuffer->frameTextureDesc.Width;
-            state.value.captureState.height = m_videoBuffer->frameTextureDesc.Height;
-            state.value.captureState.texturePtr = m_videoBuffer->frameTextureSRV.get();
-
-            // if there is transform change, update matricies
-            if (m_appCoordinateSystem != nullptr)
-            {
-                if (SUCCEEDED(m_videoBuffer->UpdateTransforms(m_appCoordinateSystem)))
-                {
-                    state.value.captureState.worldMatrix = m_videoBuffer->cameraToWorldTransform;
-                    state.value.captureState.projectionMatrix = m_videoBuffer->cameraProjectionMatrix;
-
-                    bufferChanged = true;
-                }
-            }
-            
-            if (bufferChanged)
-            {
-                Callback(state);
-            }
-        }
-		else if (L"Container" == payload.MediaEncodingProperties().Type())
-		{
-
-		}
-    });
-
-	co_return;
  }
 
 IAsyncAction CaptureEngine::StopPreviewCoroutine()
 {
-    winrt::apartment_context calling_thread;
+	winrt::apartment_context calling_thread;
 
-    // callee should have a lock on the mutex
-    if (m_payloadHandler != nullptr)
-    {
-        m_payloadHandler.OnSample(m_sampleEventToken);
-    }
+	co_await resume_background();
 
-    co_await resume_background();
+	auto guard = slim_lock_guard(m_mutex);
 
-    if (m_mediaSink != nullptr)
-    {
-        m_mediaSink.PayloadHandler(nullptr);
-        m_mediaSink = nullptr;
-    }
+	// callee should have a lock on the mutex
+	if (m_payloadHandler != nullptr)
+	{
+		m_payloadHandler.OnSample(m_sampleEventToken);
 
-    if (m_payloadHandler != nullptr)
-    {
-        m_payloadHandler = nullptr;
-    }
+		m_payloadHandler = nullptr;
+	}
 
-    if (m_mediaCapture != nullptr)
-    {
-        if (m_streamType == MediaStreamType::VideoRecord)
-        {
-            co_await m_mediaCapture.StopRecordAsync();
-        }
-        else if (m_streamType == MediaStreamType::VideoPreview)
-        {
-            co_await m_mediaCapture.StopPreviewAsync();
-        }
+	if (m_mediaSink != nullptr)
+	{
+		m_mediaSink.PayloadHandler(nullptr);
+		m_mediaSink = nullptr;
+	}
 
-        co_await ReleaseMediaCaptureAsync();
-    }
+	if (m_mediaCapture != nullptr)
+	{
+		if (m_streamType == MediaStreamType::VideoRecord)
+		{
+			co_await m_mediaCapture.StopRecordAsync();
+		}
+		else if (m_streamType == MediaStreamType::VideoPreview)
+		{
+			co_await m_mediaCapture.StopPreviewAsync();
+		}
 
-    co_await calling_thread; // switch back to calling context
-
-	co_return;
+		co_await ReleaseMediaCaptureAsync();
+	}
+	else
+	{
+		co_return;
+	}
 }
 
 
@@ -643,8 +697,6 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
 
     m_mediaCapture = mediaCapture;
 	m_initSettings = initSettings;
-
-	co_return;
 }
 
 IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
@@ -659,8 +711,6 @@ IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
     m_mediaCapture.Close();
 
     m_mediaCapture = nullptr;
-
-	co_return;
 }
 
 

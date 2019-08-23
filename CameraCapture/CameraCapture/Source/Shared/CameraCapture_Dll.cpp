@@ -8,6 +8,7 @@
 #include "UnityDeviceResource.h"
 
 #include "Plugin.CaptureEngine.h"
+#include "Media.Capture.PayloadHandler.h"
 
 namespace impl
 {
@@ -17,11 +18,12 @@ namespace impl
 namespace winrt
 {
     using namespace winrt::CameraCapture::Plugin;
+	using namespace winrt::CameraCapture::Media::Capture;
 }
 
 static INSTANCE_HANDLE s_lastPluginHandleIndex = INSTANCE_HANDLE_INVALID;
-static std::unordered_map<INSTANCE_HANDLE, winrt::IModule> s_instances;
-HRESULT GetModule(INSTANCE_HANDLE id, _Out_ winrt::IModule& module)
+static std::unordered_map<INSTANCE_HANDLE, winrt::Module> s_instances;
+HRESULT GetModule(INSTANCE_HANDLE id, _Out_ winrt::Module& module)
 {
     if (id < INSTANCE_HANDLE_START)
     {
@@ -46,7 +48,7 @@ static UnityGfxRenderer s_deviceType = kUnityGfxRendererNull;
 static IUnityInterfaces* s_unityInterfaces = nullptr;
 static IUnityGraphics* s_unityGraphics = nullptr;
 
-HRESULT TrackModule(winrt::IModule &module, INSTANCE_HANDLE * handleId)
+HRESULT TrackModule(winrt::Module &module, INSTANCE_HANDLE * handleId)
 {
     // get the last index value;
     auto handle = s_lastPluginHandleIndex;
@@ -134,7 +136,7 @@ static void UNITY_INTERFACE_API OnRenderEvent(int32_t eventID)
 
     INSTANCE_HANDLE id = static_cast<INSTANCE_HANDLE>(LOWORD(dwId));
 
-    winrt::IModule module = nullptr;
+    winrt::Module module = nullptr;
     if (SUCCEEDED(GetModule(id, module)))
     {
         uint16_t frameId = static_cast<uint16_t>(HIWORD(dwId));
@@ -156,7 +158,7 @@ extern "C" UnityRenderingEvent UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API GetRen
 extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API ReleaseInstance(
     _In_ INSTANCE_HANDLE id)
 {
-    winrt::IModule module = nullptr;
+    winrt::Module module = nullptr;
     if (SUCCEEDED(GetModule(id, module)))
     {
         s_instances.erase(id);
@@ -176,7 +178,7 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CreateCapture(
     {
         return E_INVALIDARG;
     }
-    winrt::IModule module = impl::CaptureEngine::Create(s_deviceResource, fnCallback, managedObject);
+    winrt::Module module = impl::CaptureEngine::Create(s_deviceResource, fnCallback, managedObject);
 
     return TrackModule(module, handleId);
 }
@@ -188,14 +190,18 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStartPrevie
     _In_ boolean enableAudio,
     _In_ boolean enableMrc)
 {
-    winrt::IModule module = nullptr;
-    HRESULT hr = GetModule(id, module);
+    winrt::Module module = nullptr;
+	winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
         hr = capture.StartPreview(width, height, enableAudio, enableMrc);
+		if (SUCCEEDED(hr))
+		{
+			capture.PayloadHandler(winrt::PayloadHandler());
+		}
     }
 
     return hr;
@@ -204,14 +210,14 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStartPrevie
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStopPreview(
     _In_ INSTANCE_HANDLE id)
 {
-    winrt::IModule module = nullptr;
-    HRESULT hr = GetModule(id, module);
+    winrt::Module module = nullptr;
+	winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
-        hr = capture.StopPreview();
+		hr = capture.StopPreview();
     }
 
     return hr;
@@ -221,8 +227,8 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureSetCoordina
     _In_ INSTANCE_HANDLE id,
     _In_ IUnknown* appCoodinateSystem)
 {
-    winrt::IModule module = nullptr;
-    HRESULT hr = GetModule(id, module);
+    winrt::Module module = nullptr;
+	winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();

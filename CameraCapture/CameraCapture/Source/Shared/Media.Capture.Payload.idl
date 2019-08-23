@@ -5,34 +5,24 @@
 
 namespace CameraCapture.Media.Capture
 {
-    runtimeclass Payload;
+	[version(1.0)]
+	enum PayloadType
+	{
+		Unknown,
+		Audio,
+		Video,
+		Data
+	};
 
-    [version(1.0), exclusiveto(Payload), uuid(90486f88-21fc-4a36-9b97-a445f8de7a35)]
-    interface IPayload : IInspectable
-    {
-        Windows.Media.MediaProperties.IMediaEncodingProperties MediaEncodingProperties{ get; };
-    };
+	[threading(both)]
+	[marshaling_behavior(agile)]
+	[version(1.0)]
+	runtimeclass Payload
+	{
+		Payload(Windows.Media.MediaProperties.IMediaEncodingProperties encodingProperties);
 
-    [version(1.0), exclusiveto(Payload), uuid(e9de5b47-f006-4026-9688-e30f9ef9f52c)]
-    interface IPayloadFactory : IInspectable
-    {
-        //HRESULT CreateInstance(
-        //    [in] IInspectable* outer,
-        //    [out] IInspectable** inner,
-        //    [out][retval] Payload** instance);
-        //HRESULT CreateInstanceWithProperties(
-        //    [in] Windows.Media.MediaProperties.IMediaEncodingProperties* encodingProperties, 
-        //    [in] IInspectable* outer, 
-        //    [out] IInspectable** inner, 
-        //    [out][retval] Payload** instance);
-    }
-
-    [version(1.0)]
-    [marshaling_behavior(agile)]
-    [threading(both)]
-    [composable(IPayloadFactory, protected, 1.0)]
-    runtimeclass Payload
-    {
-        [default] interface IPayload;
-    };
+		CameraCapture.Media.Capture.PayloadType Type{ get; };
+		Windows.Media.MediaProperties.IMediaEncodingProperties EncodingProperties{ get; };
+		Windows.Media.Core.MediaStreamSample MediaStreamSample{ get; };
+	}
 }

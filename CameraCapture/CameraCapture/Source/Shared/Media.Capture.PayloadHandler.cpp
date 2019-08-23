@@ -5,18 +5,25 @@
 #include "Media.Capture.PayloadHandler.h"
 #include "Media.Capture.PayloadHandler.g.cpp"
 
+#include <winrt/windows.media.h>
+#include <winrt/windows.media.core.h>
+
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
+using namespace Windows::Media::Core;
+using namespace Windows::Media::MediaProperties;
 
 PayloadHandler::PayloadHandler()
-    : m_isShutdown(false)
-    , m_workItemQueueId(MFASYNC_CALLBACK_QUEUE_UNDEFINED)
+	: m_isShutdown(false)
+	, m_workItemQueueId(MFASYNC_CALLBACK_QUEUE_UNDEFINED)
 {
-    IFT(MFAllocateSerialWorkQueue(MFASYNC_CALLBACK_QUEUE_MULTITHREADED, &m_workItemQueueId));
+	IFT(MFStartup(MF_VERSION));
+
+	IFT(MFAllocateSerialWorkQueue(MFASYNC_CALLBACK_QUEUE_MULTITHREADED, &m_workItemQueueId));
 }
 
 _Use_decl_annotations_
-HRESULT PayloadHandler::QueuePayload(
+hresult PayloadHandler::QueuePayload(
 	CameraCapture::Media::Capture::Payload const& payload)
 {
     NULL_CHK_HR(payload, S_OK);
@@ -69,14 +76,15 @@ HRESULT PayloadHandler::Invoke(
 
     auto payload = spState.as<CameraCapture::Media::Capture::Payload>();
 
-    HRESULT hr = S_OK;
+	hresult hr = S_OK;
     
-    if (m_sampleEvent)
-    {
+	{
 		std::shared_lock<slim_mutex> slock(m_mutex);
-
-        m_sampleEvent(*this, payload);
-    }
+		if (m_sampleEvent)
+		{
+			m_sampleEvent(*this, payload);
+		}
+	}
 
     return pAsyncResult->SetStatus(hr);
 }

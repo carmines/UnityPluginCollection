@@ -7,15 +7,15 @@ import "Media.Capture.Payload.idl";
 
 namespace CameraCapture.Media.Capture
 {
-    [version(1.0)]
     [marshaling_behavior(agile)]
     [threading(both)]
-    runtimeclass PayloadHandler
+	[version(1.0)]
+	runtimeclass PayloadHandler
     {
-        PayloadHandler();
+		PayloadHandler();
 
-        HRESULT QueuePayload(Payload payload);
+		HRESULT QueuePayload(Payload payload);
 
-        event Windows.Foundation.EventHandler<Payload> OnSample;
-    };
+		event Windows.Foundation.EventHandler<Payload> OnSample;
+	};
 }

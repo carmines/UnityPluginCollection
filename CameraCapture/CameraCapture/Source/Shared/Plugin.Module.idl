@@ -10,9 +10,14 @@ namespace CameraCapture.Plugin
     [version(1.0), exclusiveto(Module), uuid(3cc03f99-2721-4c86-b9e6-f8e0ac86772c)]
     interface IModule : IInspectable
     {
-        void Shutdown();
-        void OnRenderEvent(UInt16 frameNumber);
     };
+
+	[version(1.0), exclusiveto(Module), uuid(aaa9dc11-31b4-4dc7-953f-14c304a6c048)]
+	interface IModuleOverrides : IInspectable
+	{
+		void Shutdown();
+		void OnRenderEvent(UInt16 frameNumber);
+	};
 
     [version(1.0), exclusiveto(Module), uuid(269ce156-a271-48c9-a797-bf9dbae76089)]
     interface IModuleFactory : IInspectable
@@ -26,5 +31,7 @@ namespace CameraCapture.Plugin
     runtimeclass Module
     {
         [default] interface IModule;
+
+		[overridable] interface IModuleOverrides;
     };
 }

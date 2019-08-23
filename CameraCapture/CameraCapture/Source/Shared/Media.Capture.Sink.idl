@@ -19,5 +19,6 @@ namespace CameraCapture.Media.Capture
 
         State State { get; };
         PayloadHandler PayloadHandler { get; set; };
+		Windows.Media.MediaProperties.MediaEncodingProfile EncodingProfile{ get; };
     };
 }

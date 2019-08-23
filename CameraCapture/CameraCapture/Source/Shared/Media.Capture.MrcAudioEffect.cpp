@@ -8,8 +8,6 @@
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
 
-using winrtAudioMixerMode = CameraCapture::Media::Capture::AudioMixerMode;
-
 MrcAudioEffect::MrcAudioEffect()
     : m_propertySet() 
 {
@@ -25,18 +23,18 @@ Windows::Foundation::Collections::IPropertySet MrcAudioEffect::Properties()
     return m_propertySet;
 }
 
-winrtAudioMixerMode MrcAudioEffect::MixerMode()
+CameraCapture::Media::Capture::AudioMixerMode MrcAudioEffect::MixerMode()
 {
     AudioMixerMode result = DefaultAudioMixerMode;
     if (m_propertySet.HasKey(PROPERTY_MIXERMODE))
     {
-        result = unbox_value<winrtAudioMixerMode>((m_propertySet.Lookup(PROPERTY_MIXERMODE)));
+        result = unbox_value<CameraCapture::Media::Capture::AudioMixerMode>((m_propertySet.Lookup(PROPERTY_MIXERMODE)));
     }
 
     return result;
 }
 
-void MrcAudioEffect::MixerMode(winrtAudioMixerMode const& value)
+void MrcAudioEffect::MixerMode(CameraCapture::Media::Capture::AudioMixerMode const& value)
 {
-    m_propertySet.Insert(PROPERTY_MIXERMODE, box_value<winrtAudioMixerMode, uint32_t>(value));
+    m_propertySet.Insert(PROPERTY_MIXERMODE, box_value<CameraCapture::Media::Capture::AudioMixerMode, uint32_t>(value));
 }

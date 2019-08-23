@@ -4,8 +4,7 @@
 #include "pch.h"
 #include "Media.Capture.StreamSink.h"
 #include "Media.Capture.StreamSink.g.cpp"
-#include "Media.Capture.AudioPayload.h"
-#include "Media.Capture.VideoPayload.h"
+#include "Media.Capture.Payload.h"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
@@ -13,12 +12,11 @@ using namespace Windows::Foundation::Collections;
 using namespace Windows::Media::MediaProperties;
 
 using winrtPayload = CameraCapture::Media::Capture::Payload;
-using winrtSink = CameraCapture::Media::Capture::Sink;
 
 StreamSink::StreamSink(
     uint8_t index,
     IMediaEncodingProperties const& encodingProperties,
-    winrtSink const& parent)
+	CameraCapture::Media::Capture::Sink const& parent)
     : m_currentState(State::Ready)
     , m_streamIndex(index)
     , m_parentSink(parent)
@@ -29,7 +27,7 @@ StreamSink::StreamSink(
 	, m_lastTimestamp(-1)
 	, m_lastDecodeTime(-1)
 {
-    IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(encodingProperties), m_mediaType.put()));
+    IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(m_encodingProperties), m_mediaType.put()));
     IFT(m_mediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
     IFT(m_mediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
     IFT(MFCreateEventQueue(m_eventQueue.put()));
@@ -38,7 +36,7 @@ StreamSink::StreamSink(
 StreamSink::StreamSink(
     uint8_t index,
     IMFMediaType* pMediaType,
-    winrtSink const& parent)
+	CameraCapture::Media::Capture::Sink const& parent)
     : m_streamIndex(index)
     , m_parentSink(parent)
 	, m_setDiscontinuity(false)
@@ -50,7 +48,8 @@ StreamSink::StreamSink(
     IFT(pMediaType->QueryInterface(__uuidof(IMFMediaType), m_mediaType.put_void()));
     IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
     IFT(pMediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
-    IFT(MFCreateEventQueue(m_eventQueue.put()));
+	IFT(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
+	IFT(MFCreateEventQueue(m_eventQueue.put()));
 }
 
 // IMediaExtension
@@ -176,16 +175,8 @@ HRESULT StreamSink::ProcessSample(
 		handler = m_parentSink.PayloadHandler();
 		if (handler != nullptr)
 		{
-			winrtPayload payload = nullptr;
-			if (m_guidMajorType == MFMediaType_Audio)
-			{
-				IFG(AudioPayload::Create(m_mediaType.get(), pSample, payload), done);
-			}
-			else if (m_guidMajorType == MFMediaType_Video)
-			{
-				IFG(VideoPayload::Create(m_mediaType.get(), pSample, payload), done);
-			}
-
+			auto payload = make<Payload>(m_encodingProperties);
+			IFG(payload.as<IStreamSample>()->Sample(pSample), done);
 			IFG(handler.QueuePayload(payload), done);
 		}
 	}
@@ -507,11 +498,7 @@ HRESULT StreamSink::NotifyStarted()
 _Use_decl_annotations_
 HRESULT StreamSink::NotifyStopped()
 {
-    PROPVARIANT propVar;
-    PropVariantInit(&propVar);
-    propVar.vt = VT_EMPTY;
-    IFR(QueueEvent(MEStreamSinkStopped, GUID_NULL, S_OK, &propVar));
-    IFR(PropVariantClear(&propVar));
+    IFR(QueueEvent(MEStreamSinkStopped, GUID_NULL, S_OK, NULL));
 
     return S_OK;
 }
@@ -519,18 +506,7 @@ HRESULT StreamSink::NotifyStopped()
 _Use_decl_annotations_
 HRESULT StreamSink::NotifyMarker(const PROPVARIANT *pVarContextValue)
 {
-    if (pVarContextValue == nullptr)
-    {
-        PROPVARIANT propVar;
-        PropVariantInit(&propVar);
-        propVar.vt = VT_EMPTY;
-        IFR(QueueEvent(MEStreamSinkMarker, GUID_NULL, S_OK, &propVar));
-        IFR(PropVariantClear(&propVar));
-    }
-    else
-    {
-        IFR(QueueEvent(MEStreamSinkMarker, GUID_NULL, S_OK, pVarContextValue));
-    }
+    IFR(QueueEvent(MEStreamSinkMarker, GUID_NULL, S_OK, pVarContextValue));
 
     return S_OK;
 }

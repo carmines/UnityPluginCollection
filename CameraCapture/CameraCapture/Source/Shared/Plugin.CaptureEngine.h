@@ -17,7 +17,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 {
     struct CaptureEngine : CaptureEngineT<CaptureEngine, Module>
     {
-        static Plugin::IModule Create(
+        static Plugin::Module Create(
             _In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice,
             _In_ StateChangedCallback fnCallback,
             _In_ void* pCallbackObject);
@@ -26,20 +26,20 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         virtual void Shutdown();
 
-        HRESULT StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc);
-        HRESULT StopPreview();
+        hresult StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc);
+		hresult StopPreview();
 
-        Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem()
-        {
-            return m_appCoordinateSystem;
-        }
-        void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value)
-        {
-            m_appCoordinateSystem = value;
-        }
+		CameraCapture::Media::Capture::Sink MediaSink();
+
+		CameraCapture::Media::Capture::PayloadHandler PayloadHandler();
+		void PayloadHandler(CameraCapture::Media::Capture::PayloadHandler const& value);
+
+		Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
+		void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
+
 
     private:
-        HRESULT CreateDeviceResources();
+        hresult CreateDeviceResources();
         void ReleaseDeviceResources();
 
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);

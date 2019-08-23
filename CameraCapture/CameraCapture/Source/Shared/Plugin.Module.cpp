@@ -28,7 +28,7 @@ void Module::OnRenderEvent(
 }
 
 _Use_decl_annotations_
-HRESULT Module::Initialize(
+hresult Module::Initialize(
     std::weak_ptr<IUnityDeviceResource> const& unityDevice,
     StateChangedCallback stateCallback, 
     void* pCallbackObject)
@@ -50,7 +50,7 @@ HRESULT Module::Initialize(
 }
 
 _Use_decl_annotations_
-HRESULT Module::Callback(
+hresult Module::Callback(
     CALLBACK_STATE state)
 {
 	std::shared_lock<slim_mutex> slock(m_mutex);
@@ -63,7 +63,7 @@ HRESULT Module::Callback(
 }
 
 _Use_decl_annotations_
-HRESULT Module::Failed()
+hresult Module::Failed()
 {
     CALLBACK_STATE state{};
     ZeroMemory(&state, sizeof(CALLBACK_STATE));
