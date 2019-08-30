@@ -4,7 +4,7 @@
 #pragma once
 
 import "Plugin.Module.idl";
-import "Media.Capture.PayloadHandler.idl";
+import "Media.PayloadHandler.idl";
 import "Media.Capture.Sink.idl";
 
 namespace CameraCapture.Plugin
@@ -19,8 +19,8 @@ namespace CameraCapture.Plugin
         HRESULT StartPreview(UInt32 width, UInt32 height, Boolean enableAudio, Boolean enableMrc);
         HRESULT StopPreview();
 
+		CameraCapture.Media.PayloadHandler PayloadHandler{ get; set; };
 		CameraCapture.Media.Capture.Sink MediaSink{ get; };
-		CameraCapture.Media.Capture.PayloadHandler PayloadHandler{ get; set; };
         Windows.Perception.Spatial.SpatialCoordinateSystem AppCoordinateSystem{ get; set; };
     };
 }

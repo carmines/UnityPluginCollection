@@ -5,9 +5,9 @@
 
 #include "Plugin.CaptureEngine.g.h"
 #include "Plugin.Module.h"
-#include "Media.Capture.Sink.h"
-#include "Media.Capture.PayloadHandler.h"
+#include "Media.PayloadHandler.h"
 #include "Media.SharedTexture.h"
+#include "Media.Capture.Sink.h"
 
 #include <mfapi.h>
 #include <winrt/windows.media.h>
@@ -23,6 +23,7 @@ namespace winrt::CameraCapture::Plugin::implementation
             _In_ void* pCallbackObject);
 
         CaptureEngine();
+		~CaptureEngine();
 
         virtual void Shutdown();
 
@@ -31,14 +32,16 @@ namespace winrt::CameraCapture::Plugin::implementation
 
 		CameraCapture::Media::Capture::Sink MediaSink();
 
-		CameraCapture::Media::Capture::PayloadHandler PayloadHandler();
-		void PayloadHandler(CameraCapture::Media::Capture::PayloadHandler const& value);
+		CameraCapture::Media::PayloadHandler PayloadHandler();
+		void PayloadHandler(CameraCapture::Media::PayloadHandler const& value);
 
 		Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
 		void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
 
 
     private:
+		void ResetPayloadHandler();
+
         hresult CreateDeviceResources();
         void ReleaseDeviceResources();
 
@@ -52,15 +55,17 @@ namespace winrt::CameraCapture::Plugin::implementation
         Windows::Foundation::IAsyncAction RemoveMrcEffectsAsync();
 
     private:
-        slim_mutex m_mutex;
-        std::atomic<boolean> m_isShutdown;
+		CRITICAL_SECTION m_cs;
+		std::atomic<boolean> m_isShutdown;
+		winrt::handle m_startPreviewEventHandle;
+		winrt::handle m_stopPreviewEventHandle;
+
+        com_ptr<ID3D11Device> m_mediaDevice;
+        uint32_t m_resetToken;
+        com_ptr<IMFDXGIDeviceManager> m_dxgiDeviceManager;
 
         Windows::Foundation::IAsyncAction m_startPreviewOp;
         Windows::Foundation::IAsyncAction m_stopPreviewOp;
-
-        com_ptr<ID3D11Device> m_d3dDevice;
-        uint32_t m_resetToken;
-        com_ptr<IMFDXGIDeviceManager> m_dxgiDeviceManager;
 
         // media capture
 		Windows::Media::Capture::MediaCategory m_category;
@@ -76,12 +81,17 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         // IMFMediaSink
         Media::Capture::Sink m_mediaSink;
-        Media::Capture::PayloadHandler m_payloadHandler;
-        event_token m_sampleEventToken;
+
+        Media::PayloadHandler m_payloadHandler;
+        event_token m_profileEventToken;
+        event_token m_payloadEventToken;
+		event_token m_streamSampleEventToken;
+        event_token m_streamMetaDataEventToken;
+		event_token m_streamDescriptionEventToken;
 
         // buffers
         com_ptr<IMFSample> m_audioSample;
-        com_ptr<SharedTexture> m_videoBuffer;
+        com_ptr<SharedTexture> m_sharedVideoTexture;
 
         Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };

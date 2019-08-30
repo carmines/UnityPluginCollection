@@ -4,14 +4,17 @@
 #include "pch.h"
 #include "Media.Capture.StreamSink.h"
 #include "Media.Capture.StreamSink.g.cpp"
-#include "Media.Capture.Payload.h"
+#include "Media.Payload.h"
+#include "Media.PayloadHandler.h"
+#include "Media.Functions.h"
+
+#include <winrt/windows.media.mediaproperties.h>
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
 using namespace Windows::Foundation::Collections;
 using namespace Windows::Media::MediaProperties;
 
-using winrtPayload = CameraCapture::Media::Capture::Payload;
 
 StreamSink::StreamSink(
     uint8_t index,
@@ -45,8 +48,8 @@ StreamSink::StreamSink(
 	, m_lastTimestamp(-1)
 	, m_lastDecodeTime(-1)
 {
-    IFT(pMediaType->QueryInterface(__uuidof(IMFMediaType), m_mediaType.put_void()));
-    IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
+	m_mediaType.copy_from(pMediaType);
+	IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
     IFT(pMediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
 	IFT(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
 	IFT(MFCreateEventQueue(m_eventQueue.put()));
@@ -111,6 +114,15 @@ HRESULT StreamSink::Flush()
 	m_lastTimestamp = -1;
 	m_lastDecodeTime = -1;
 
+	auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
+	propSet.Insert(MF_PAYLOAD_FLUSH, box_value<uint32_t>(1));
+
+	auto handler = m_parentSink.PayloadHandler();
+	if (handler != nullptr)
+	{
+		handler.QueueStreamMetadata(propSet);
+	}
+
     //auto payloadProcessor = m_parentMediaSink.as<MixedRemoteViewCompositor::Media::NetworkMediaSink>().PayloadProcessor();
     //if (payloadProcessor != nullptr)
     //{
@@ -149,7 +161,7 @@ HRESULT StreamSink::ProcessSample(
     IMFSample *pSample)
 {
 	HRESULT hr = S_OK;
-	PayloadHandler handler = nullptr;
+
 	bool shouldDrop = false;
 
 	std::shared_lock<slim_mutex> slock(m_mutex);
@@ -161,7 +173,7 @@ HRESULT StreamSink::ProcessSample(
         IFG(MF_E_INVALIDREQUEST, done);
     }
 
-	IFG(ShouldDropSample(pSample, &shouldDrop), done);
+	hr = ShouldDropSample(pSample, &shouldDrop);
 
 	if (!shouldDrop)
 	{
@@ -172,19 +184,20 @@ HRESULT StreamSink::ProcessSample(
 			m_setDiscontinuity = false;
 		}
 
-		handler = m_parentSink.PayloadHandler();
+		auto handler = m_parentSink.PayloadHandler().as<Media::implementation::PayloadHandler>();
 		if (handler != nullptr)
 		{
-			auto payload = make<Payload>(m_encodingProperties);
-			IFG(payload.as<IStreamSample>()->Sample(pSample), done);
-			IFG(handler.QueuePayload(payload), done);
+			com_ptr<IMFSample> spSample = nullptr;
+			spSample.copy_from(pSample); //add ref
+
+			handler->QueueMFSample(m_guidMajorType, m_mediaType, spSample);
 		}
 	}
 
 done:
     if (State() == State::Started && SUCCEEDED(hr))
 	{
-        hr = NotifyRequestSample();
+        IFR(NotifyRequestSample());
     }
 
     return hr;
@@ -196,8 +209,6 @@ HRESULT StreamSink::PlaceMarker(
     const PROPVARIANT * pvarMarkerValue,
     const PROPVARIANT * pvarContextValue)
 {
-    UNREFERENCED_PARAMETER(pvarMarkerValue);
-
 	std::shared_lock<slim_mutex> slock(m_mutex);
 
     IFR(CheckShutdown());
@@ -207,7 +218,7 @@ HRESULT StreamSink::PlaceMarker(
         IFR(MF_E_INVALIDREQUEST);
     }
 
-    if (eMarkerType == MFSTREAMSINK_MARKER_TYPE::MFSTREAMSINK_MARKER_ENDOFSEGMENT)
+    if (eMarkerType == MFSTREAMSINK_MARKER_ENDOFSEGMENT)
     {
         State(State::Eos);
 
@@ -215,11 +226,15 @@ HRESULT StreamSink::PlaceMarker(
         {
             IFR(m_parentSink.OnEndOfStream());
         }
-    }
+	}
+
+	auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
+
+	propSet.Insert(MF_PAYLOAD_MARKER_TYPE, box_value<uint32_t>(eMarkerType));
 
     if (eMarkerType == MFSTREAMSINK_MARKER_TICK)
     {
-        if (pvarMarkerValue != nullptr || pvarMarkerValue->vt == VT_I8)
+        if (pvarMarkerValue != nullptr && pvarMarkerValue->vt == VT_I8)
         {
             LARGE_INTEGER timeStamp = { 0 };
             timeStamp = pvarMarkerValue->hVal;
@@ -238,26 +253,23 @@ HRESULT StreamSink::PlaceMarker(
 
                 timeStamp.QuadPart = correctedSampleTime;
             }
+
+			propSet.Insert(MF_PAYLOAD_MARKER_TICK, ConvertProperty(*pvarContextValue));
+			propSet.Insert(MF_PAYLOAD_MARKER_TICK_TIMESTAMP, ConvertProperty(*pvarMarkerValue));
         }
     }
 
-    auto handler = m_parentSink.PayloadHandler();
-    if (handler != nullptr)
-    {
-        winrtPayload payload = nullptr;
+	HRESULT hr = S_OK;
 
-        //    auto marker = make<Marker>(m_streamId);
-        //    auto markerPriv = marker.as<IMarkerPriv>();
-        //    markerPriv->MarkerType(eMarkerType);
-        //    markerPriv->MarkerValue(pvarMarkerValue);
-        //    markerPriv->ContextValue(pvarContextValue);
-
-        IFR(handler.QueuePayload(payload));
-    }
+	auto handler = m_parentSink.PayloadHandler();
+	if (handler != nullptr)
+	{
+		handler.QueueStreamMetadata(propSet);
+	}
 
     IFR(NotifyMarker(pvarContextValue));
 
-    return S_OK;
+    return hr;
 }
 
 // IMFMediaEventGenerator
@@ -389,16 +401,13 @@ HRESULT StreamSink::SetCurrentMediaType(
     IFR(mediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
 
     m_mediaType = mediaType;
+	IFR(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
 
-    //auto payloadProcessor = m_parentSink->PayloadProcessor();
-    //if (payloadProcessor != nullptr)
-    //{
-    //    auto setMediaType = make<MediaType>(m_streamId);
-    //    IFR(setMediaType.as<IMediaTypeInternal>()->SetMediaType(m_mediaType.get()));
-
-    //    auto payload = MixedRemoteViewCompositor::Media::Payload(static_cast<uint32_t>(m_streamId), MixedRemoteViewCompositor::Media::PayloadType::SetMediaType, setMediaType);
-    //    IFR(payloadProcessor.QueuePayload(payload));
-    //}
+	auto handler = m_parentSink.PayloadHandler();
+	if (handler != nullptr)
+    {
+		handler.QueueStreamMediaDescription(m_encodingProperties);
+    }
 
     return S_OK;
 }
@@ -416,6 +425,12 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
     m_clockStartOffset = clockStartOffset;
 
     State(State::Started);
+
+	auto handler = m_parentSink.PayloadHandler();
+	if (handler != nullptr)
+	{
+		handler.QueueStreamMediaDescription(m_encodingProperties);
+	}
 
     IFR(NotifyStarted());
 

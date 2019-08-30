@@ -27,8 +27,8 @@ EXTERN_GUID(MFSampleExtension_Spatial_CameraProjectionTransform, 0x47f9fcb5, 0x2
 #endif
 
 HRESULT SharedTexture::Create(
-    com_ptr<ID3D11Device> const& d3dDevice,
-	com_ptr<IMFDXGIDeviceManager> const& dxgiDeviceManager,
+    com_ptr<ID3D11Device> const d3dDevice,
+	com_ptr<IMFDXGIDeviceManager> const dxgiDeviceManager,
     uint32_t width, uint32_t height,
     com_ptr<SharedTexture>& sharedTexture)
 {
@@ -160,6 +160,9 @@ void SharedTexture::Reset()
     frameTexture = nullptr;
 
     ZeroMemory(&frameTextureDesc, sizeof(CD3D11_TEXTURE2D_DESC));
+
+	m_locator = nullptr;
+	m_frameOfReference = nullptr;
 }
 
 HRESULT SharedTexture::UpdateTransforms(

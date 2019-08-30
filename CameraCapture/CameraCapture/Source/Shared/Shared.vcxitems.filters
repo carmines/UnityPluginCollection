@@ -17,12 +17,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.cpp">
       <Filter>Media\Capture</Filter>
     </ClCompile>
-    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.cpp">
-      <Filter>Media\Capture</Filter>
-    </ClCompile>
-    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.cpp">
-      <Filter>Media\Capture</Filter>
-    </ClCompile>
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.cpp">
       <Filter>Media\Capture</Filter>
     </ClCompile>
@@ -33,6 +27,12 @@
       <Filter>Media</Filter>
     </ClCompile>
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Functions.cpp">
+      <Filter>Media</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Payload.cpp">
+      <Filter>Media</Filter>
+    </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.cpp">
       <Filter>Media</Filter>
     </ClCompile>
   </ItemGroup>
@@ -71,12 +71,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.h">
       <Filter>Media\Capture</Filter>
     </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.h">
-      <Filter>Media\Capture</Filter>
-    </ClInclude>
-    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.h">
-      <Filter>Media\Capture</Filter>
-    </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.h">
       <Filter>Media\Capture</Filter>
     </ClInclude>
@@ -87,6 +81,12 @@
       <Filter>Media</Filter>
     </ClInclude>
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Functions.h">
+      <Filter>Media</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Payload.h">
+      <Filter>Media</Filter>
+    </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.h">
       <Filter>Media</Filter>
     </ClInclude>
   </ItemGroup>
@@ -103,12 +103,6 @@
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.idl">
       <Filter>Media\Capture</Filter>
     </Midl>
-    <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.idl">
-      <Filter>Media\Capture</Filter>
-    </Midl>
-    <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.idl">
-      <Filter>Media\Capture</Filter>
-    </Midl>
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.idl">
       <Filter>Media\Capture</Filter>
     </Midl>
@@ -117,6 +111,12 @@
     </Midl>
     <Midl Include="$(MSBuildThisFileDirectory)Plugin.CaptureEngine.idl">
       <Filter>Plugin</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Media.Payload.idl">
+      <Filter>Media</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.idl">
+      <Filter>Media</Filter>
     </Midl>
   </ItemGroup>
   <ItemGroup>

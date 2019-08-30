@@ -283,6 +283,11 @@ HRESULT Sink::GetPresentationClock(
         m_presentationClock.copy_to(ppPresentationClock);
     }
 
+	if (m_payloadHandler != nullptr)
+	{
+		m_payloadHandler.QueueMediaProfile(m_mediaEncodingProfile);
+	}
+
     return S_OK;
 }
 

@@ -4,9 +4,11 @@
 #include "pch.h"
 #include "Media.Functions.h"
 
-#include <windows.graphics.directx.direct3d11.interop.h>
-
 #include <mfapi.h>
+#include <mferror.h>
+#include <inspectable.h>
+#include <windows.graphics.directx.direct3d11.interop.h>
+#include <winrt/windows.perception.spatial.h>
 
 using namespace winrt;
 using namespace winrt::Windows::Foundation;
@@ -16,6 +18,14 @@ using namespace winrt::Windows::Media::Core;
 using namespace winrt::Windows::Media::Devices;
 using namespace winrt::Windows::Media::MediaProperties;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
+using namespace winrt::Windows::Perception::Spatial;
+
+#if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
+EXTERN_GUID(MFSampleExtension_DeviceTimestamp, 0x8f3e35e7, 0x2dcd, 0x4887, 0x86, 0x22, 0x2a, 0x58, 0xba, 0xa6, 0x52, 0xb0);
+EXTERN_GUID(MFSampleExtension_Spatial_CameraCoordinateSystem, 0x9d13c82f, 0x2199, 0x4e67, 0x91, 0xcd, 0xd1, 0xa4, 0x18, 0x1f, 0x25, 0x34);
+EXTERN_GUID(MFSampleExtension_Spatial_CameraViewTransform, 0x4e251fa4, 0x830f, 0x4770, 0x85, 0x9a, 0x4b, 0x8d, 0x99, 0xaa, 0x80, 0x9b);
+EXTERN_GUID(MFSampleExtension_Spatial_CameraProjectionTransform, 0x47f9fcb5, 0x2a02, 0x4f26, 0xa4, 0x77, 0x79, 0x2f, 0xdf, 0x95, 0x88, 0x6a);
+#endif
 
 // Check for SDK Layer support.
 inline bool SdkLayersAvailable()
@@ -280,14 +290,8 @@ HRESULT CopySample(
     NULL_CHK_HR(srcSample, E_INVALIDARG);
     NULL_CHK_HR(dstSample, E_INVALIDARG);
 
-    // copy sample attributes
-    com_ptr<IMFAttributes> srcAttributes = nullptr;
-    IFR(srcSample->QueryInterface(__uuidof(IMFAttributes), srcAttributes.put_void()));
-
-    com_ptr<IMFAttributes> dstAttributes = nullptr;
-    IFR(dstSample->QueryInterface(__uuidof(IMFAttributes), dstAttributes.put_void()));
-
-    IFR(srcAttributes->CopyAllItems(dstAttributes.get()));
+	// copy IMFAttributes
+    IFR(srcSample->CopyAllItems(dstSample.get()));
 
     // get the sample time, duration and flags
     LONGLONG sampleTime = 0;
@@ -319,7 +323,7 @@ HRESULT CopySample(
         com_ptr<IMFMediaBuffer> srcBuffer = nullptr;
         if (srcBufferCount > 1)
         {
-            IFR(srcSample->ConvertToContiguousBuffer(srcBuffer.put()));
+            IFR(srcSample->ConvertToContiguousBuffer(srcBuffer.put())); // GPU -> CPU
         }
         else
         {
@@ -339,12 +343,9 @@ HRESULT CopySample(
             IFR(dstSample->GetBufferByIndex(0, dstBuffer.put()));
         }
 
-        // QI for MF2DBuffer2
-        com_ptr<IMF2DBuffer2> srcBuffer2D = nullptr;
-        IFR(srcBuffer->QueryInterface(__uuidof(IMF2DBuffer2), srcBuffer2D.put_void()));
-
-        com_ptr<IMF2DBuffer2> dstBuffer2D = nullptr;
-        IFR(dstBuffer->QueryInterface(__uuidof(IMF2DBuffer2), dstBuffer2D.put_void()));
+		// QI
+        auto srcBuffer2D = srcBuffer.as<IMF2DBuffer2>();
+		auto dstBuffer2D = dstBuffer.as<IMF2DBuffer2>();
 
         // copy the media buffer
         IFR(srcBuffer2D->Copy2DTo(dstBuffer2D.get()));
@@ -354,11 +355,11 @@ HRESULT CopySample(
 }
 
 template <typename T>
-winrt::array_view<const T> from_safe_array(LPSAFEARRAY const& safeArray)
+array_view<const T> from_safe_array(LPSAFEARRAY const& safeArray)
 {
 	auto start = reinterpret_cast<T*>(safeArray->pvData);
 	auto end = start + safeArray->cbElements;
-	return winrt::array_view<const T>(start, end);
+	return array_view<const T>(start, end);
 }
 
 inline winrt::Windows::Foundation::IInspectable ConvertProperty(PROPVARIANT const& var)
@@ -447,13 +448,13 @@ inline winrt::Windows::Foundation::IInspectable ConvertProperty(PROPVARIANT cons
 }
 
 HRESULT CopyAttributesToMediaStreamSample(
-	com_ptr<IMFAttributes> const& attributes,
-	MediaStreamSample const& sample)
+	_In_ com_ptr<IMFSample> const& mediaSample,
+	_In_ MediaStreamSample const& streamSample)
 {
 	UINT32 cAttributes;
-	IFR(attributes->GetCount(&cAttributes));
+	IFR(mediaSample->GetCount(&cAttributes));
 
-	auto propertySet = sample.ExtendedProperties();
+	auto propertySet = streamSample.ExtendedProperties();
 
 	PROPVARIANT propVar = {};
 	for (UINT32 unIndex = 0; unIndex < cAttributes; ++unIndex)
@@ -461,7 +462,7 @@ HRESULT CopyAttributesToMediaStreamSample(
 		PropVariantClear(&propVar);
 
 		GUID guidAttributeKey;
-		IFR(attributes->GetItemByIndex(unIndex, &guidAttributeKey, &propVar));
+		IFR(mediaSample->GetItemByIndex(unIndex, &guidAttributeKey, &propVar));
 
 		auto value = ConvertProperty(propVar);
 		if (value != nullptr)
@@ -476,6 +477,323 @@ HRESULT CopyAttributesToMediaStreamSample(
 
 	PropVariantClear(&propVar);
 
+	// HoloLens specific properties to check for and add
+	UINT32 sizeCameraView = 0;
+	Numerics::float4x4 cameraView{};
+	if (SUCCEEDED(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &sizeCameraView)))
+	{
+		auto iinspectable = propertySet.TryLookup(MFSampleExtension_Spatial_CameraViewTransform);
+		if (iinspectable != nullptr)
+		{
+			propertySet.Remove(MFSampleExtension_Spatial_CameraViewTransform);
+		}
+		propertySet.Insert(MFSampleExtension_Spatial_CameraViewTransform, box_value(cameraView));
+	}
+
+	// coordinate space
+	SpatialCoordinateSystem cameraCoordinateSystem = nullptr;
+	if (SUCCEEDED(mediaSample->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, winrt::guid_of<SpatialCoordinateSystem>(), winrt::put_abi(cameraCoordinateSystem))))
+	{
+		auto iinspectable = propertySet.TryLookup(MFSampleExtension_Spatial_CameraCoordinateSystem);
+		if (iinspectable != nullptr)
+		{
+			propertySet.Remove(MFSampleExtension_Spatial_CameraCoordinateSystem);
+		}
+		propertySet.Insert(MFSampleExtension_Spatial_CameraCoordinateSystem, box_value(cameraCoordinateSystem));
+	}
+
+	// projection matrix
+	UINT32 sizeCameraProject = 0;
+	Numerics::float4x4 cameraProjectionMatrix{};
+	if (SUCCEEDED(mediaSample->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&cameraProjectionMatrix, sizeof(cameraProjectionMatrix), &sizeCameraProject)))
+	{
+		auto iinspectable = propertySet.TryLookup(MFSampleExtension_Spatial_CameraProjectionTransform);
+		if (iinspectable != nullptr)
+		{
+			propertySet.Remove(MFSampleExtension_Spatial_CameraProjectionTransform);
+		}
+		propertySet.Insert(MFSampleExtension_Spatial_CameraProjectionTransform, box_value(cameraProjectionMatrix));
+	}
+
+	// intrinsics
+	UINT32 sizeCameraIntrinsics = 0;
+	MFPinholeCameraIntrinsics cameraIntrinsics{};
+	if (SUCCEEDED(mediaSample->GetBlob(MFSampleExtension_PinholeCameraIntrinsics, (UINT8 *)&cameraIntrinsics, sizeof(cameraIntrinsics), &sizeCameraIntrinsics)))
+	{
+		auto iinspectable = propertySet.TryLookup(MFSampleExtension_PinholeCameraIntrinsics);
+		if (iinspectable != nullptr)
+		{
+			propertySet.Remove(MFSampleExtension_PinholeCameraIntrinsics);
+		}
+
+		auto start = reinterpret_cast<uint8_t*>(&cameraIntrinsics);
+		auto end = start + sizeCameraIntrinsics;
+		iinspectable = PropertyValue::CreateUInt8Array(array_view<const uint8_t>(start, end));
+
+		propertySet.Insert(MFSampleExtension_PinholeCameraIntrinsics, iinspectable);
+	}
+
+	// extrinsices
+	UINT32 sizeCameraExtrinsics = 0;
+	MFCameraExtrinsics cameraExtrinsics{};
+	if (SUCCEEDED(mediaSample->GetBlob(MFSampleExtension_CameraExtrinsics, (UINT8 *)&cameraExtrinsics, sizeof(cameraExtrinsics), &sizeCameraExtrinsics)))
+	{
+		auto iinspectable = propertySet.TryLookup(MFSampleExtension_CameraExtrinsics);
+		if (iinspectable != nullptr)
+		{
+			propertySet.Remove(MFSampleExtension_CameraExtrinsics);
+		}
+
+		auto start = reinterpret_cast<uint8_t*>(&cameraExtrinsics);
+		auto end = start + sizeCameraExtrinsics;
+		iinspectable = PropertyValue::CreateUInt8Array(array_view<const uint8_t>(start, end));
+
+		propertySet.Insert(MFSampleExtension_CameraExtrinsics, iinspectable);
+	}
+
 	return S_OK;
 }
 
+_Use_decl_annotations_
+HRESULT GetDXGISurfaceFromSample(
+	com_ptr<IMFSample> const& mediaSample,
+	com_ptr<IDXGISurface2>& surface)
+{
+	// validate it has only one buffer
+	DWORD bufferCount = 0;
+	IFR(mediaSample->GetBufferCount(&bufferCount));
+
+	if (bufferCount > 1)
+	{
+		IFR(MF_E_INVALIDTYPE); 
+	}
+
+	com_ptr<IMFMediaBuffer> mediaBuffer = nullptr;
+	IFR(mediaSample->GetBufferByIndex(0, mediaBuffer.put()));
+
+	com_ptr<IMFDXGIBuffer> mediaDxgiBuffer = nullptr;
+	IFR(mediaBuffer->QueryInterface(__uuidof(IMFDXGIBuffer), mediaDxgiBuffer.put_void()));
+
+	com_ptr<IDXGISurface2> dxgiSurface = nullptr;
+	if (FAILED(mediaDxgiBuffer->GetResource(__uuidof(IDXGISurface2), dxgiSurface.put_void()))) // TEXTURE2D
+	{
+		com_ptr<IDXGIResource1> dxgiResource = nullptr;
+		IFR(mediaDxgiBuffer->GetResource(__uuidof(IDXGIResource1), dxgiResource.put_void())); // TEXTURE2DARRAY
+
+		UINT subResource = 0;
+		IFR(mediaDxgiBuffer->GetSubresourceIndex(&subResource));
+
+		IFR(dxgiResource->CreateSubresourceSurface(subResource, dxgiSurface.put()));
+	}
+
+	surface.attach(dxgiSurface.detach());
+
+	return S_OK;
+}
+
+_Use_decl_annotations_
+HRESULT CreateMediaStreamSample(
+	com_ptr<IMFSample> const& mediaSample, 
+	TimeSpan const& timeStamp, 
+	MediaStreamSample& streamSample)
+{
+	MediaStreamSample mediaStreamSample = nullptr;
+
+	com_ptr<IDXGISurface2> dxgiSurface = nullptr;
+	if (SUCCEEDED(GetDXGISurfaceFromSample(mediaSample, dxgiSurface)))
+	{
+		com_ptr<::IInspectable> surface = nullptr;
+		IFR(CreateDirect3D11SurfaceFromDXGISurface(dxgiSurface.get(), surface.put()));
+
+		auto d3dSurace = surface.as<IDirect3DSurface>();
+
+		mediaStreamSample = MediaStreamSample::CreateFromDirect3D11Surface(d3dSurace, timeStamp);
+	}
+	else
+	{
+		com_ptr<IMFMediaBuffer> mediaBuffer;
+		IFR(mediaSample->ConvertToContiguousBuffer(mediaBuffer.put()));
+
+		winrt::Windows::Storage::Streams::IBuffer sampleBuffer = nullptr;
+
+		DWORD bufferLength = 0;
+		BYTE *srcBuffer = nullptr;
+		if (SUCCEEDED(mediaBuffer->Lock(&srcBuffer, nullptr, &bufferLength)))
+		{
+			sampleBuffer = make<CustomBuffer>(bufferLength); // TODO: make a pool of buffers and resize if required
+
+			auto bufferByteAccess = sampleBuffer.as<IBufferByteAccess>();
+
+			BYTE *dstBuffer = nullptr;
+			if SUCCEEDED(bufferByteAccess->Buffer(&dstBuffer))
+			{
+				CopyMemory(dstBuffer, srcBuffer, bufferLength);
+
+				sampleBuffer.Length(bufferLength);
+			}
+
+			IFR(mediaBuffer->Unlock());
+		}
+
+		mediaStreamSample = MediaStreamSample::CreateFromBuffer(sampleBuffer, timeStamp);
+	}
+
+	IFR(CopyAttributesToMediaStreamSample(mediaSample, mediaStreamSample));
+
+	// Set MediaStream Properties
+	LONGLONG sampleDuration = 0;
+	IFR(mediaSample->GetSampleDuration(&sampleDuration));
+	mediaStreamSample.Duration(TimeSpan{ sampleDuration });
+
+	UINT32 isDiscontinuous = false;
+	if (FAILED(mediaSample->GetUINT32(MFSampleExtension_Discontinuity, &isDiscontinuous)))
+	{
+		isDiscontinuous = false;
+	}
+	mediaStreamSample.Discontinuous(static_cast<bool>(isDiscontinuous));
+
+	UINT32 isKeyFrame = false;
+	if (FAILED(mediaSample->GetUINT32(MFSampleExtension_CleanPoint, &isKeyFrame)))
+	{
+		isKeyFrame = false;
+	}
+	mediaStreamSample.KeyFrame(static_cast<bool>(isKeyFrame));
+
+	UINT64 sampleTimeQpc = 0;
+	if (SUCCEEDED(mediaSample->GetUINT64(MFSampleExtension_DeviceTimestamp, &sampleTimeQpc)))
+	{
+		mediaStreamSample.DecodeTimestamp(TimeSpan{ sampleTimeQpc });
+	}
+
+	streamSample = mediaStreamSample;
+
+	return S_OK;
+}
+
+_Use_decl_annotations_
+HRESULT CopyToTargetTexture(
+	com_ptr<ID3D11Device> const& d3dDevice,
+	com_ptr<ID3D11DeviceContext> const& d3dDeviceContext,
+	com_ptr<ID3D11Texture2D> const& source,
+	DXGI_COLOR_SPACE_TYPE const inputColorSpace, 
+	com_ptr<ID3D11Texture2D> const& target, 
+	DXGI_COLOR_SPACE_TYPE const targetColorSpace)
+{
+	auto videoDevice = d3dDevice.as<ID3D11VideoDevice>();
+	auto videoContext = d3dDeviceContext.as<ID3D11VideoContext1>();
+
+	D3D11_TEXTURE2D_DESC sourceDesc{};
+	source->GetDesc(&sourceDesc);
+
+	D3D11_TEXTURE2D_DESC destDesc{};
+	target->GetDesc(&destDesc);
+
+	// create enumerator
+	D3D11_VIDEO_PROCESSOR_CONTENT_DESC vpcdesc{};
+	vpcdesc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+	vpcdesc.InputFrameRate.Numerator = 60;
+	vpcdesc.InputFrameRate.Denominator = 1;
+	vpcdesc.InputWidth = sourceDesc.Width;
+	vpcdesc.InputHeight = sourceDesc.Height;
+	vpcdesc.OutputFrameRate.Numerator = 60;
+	vpcdesc.OutputFrameRate.Denominator = 1;
+	vpcdesc.OutputWidth = destDesc.Width;
+	vpcdesc.OutputHeight = destDesc.Height;
+	vpcdesc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL; // D3D11_VIDEO_USAGE_OPTIMAL_SPEED or D3D11_VIDEO_USAGE_OPTIMAL_QUALITY
+
+	com_ptr<ID3D11VideoProcessorEnumerator> videoProcEnum = nullptr;
+	IFR(videoDevice->CreateVideoProcessorEnumerator(&vpcdesc, videoProcEnum.put()));
+
+	// create processor
+	com_ptr<ID3D11VideoProcessor> videoProc = nullptr;
+	IFR(videoDevice->CreateVideoProcessor(videoProcEnum.get(), 0, videoProc.put()));
+	videoContext->VideoProcessorSetStreamFrameFormat(videoProc.get(), 0, D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE);
+
+	// set colorspaces
+	videoContext->VideoProcessorSetStreamColorSpace1(videoProc.get(), 0, inputColorSpace);
+	videoContext->VideoProcessorSetOutputColorSpace1(videoProc.get(), targetColorSpace);
+
+	// 
+	D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC inputDesc{};
+	inputDesc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+	inputDesc.Texture2D.MipSlice = 0;
+	inputDesc.Texture2D.ArraySlice = 0;
+
+	com_ptr<ID3D11VideoProcessorInputView> inputView = nullptr;
+	IFR(videoDevice->CreateVideoProcessorInputView(source.get(), videoProcEnum.get(), &inputDesc, inputView.put()));
+
+	D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC outputDesc{};
+	outputDesc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+	outputDesc.Texture2D.MipSlice = 0;
+
+	com_ptr<ID3D11VideoProcessorOutputView> outputView = nullptr;
+	IFR(videoDevice->CreateVideoProcessorOutputView(target.get(), videoProcEnum.get(), &outputDesc, outputView.put()));
+
+	// blit
+	D3D11_VIDEO_PROCESSOR_STREAM vpStream{};
+	vpStream.Enable = TRUE;
+	vpStream.pInputSurface = inputView.get();
+	IFR(videoContext->VideoProcessorBlt(videoProc.get(), outputView.get(), 0, 1, &vpStream));
+
+	return S_OK;
+}
+
+HRESULT NV12ToRGB(
+	_In_ byte* pSrcBuffer,
+	_In_ byte* pDstBuffer,
+	_In_ int height,
+	_In_ int width,
+	_In_ int stride,
+	_In_ bool yFlip)
+{
+	NULL_CHK_HR(pSrcBuffer, E_INVALIDARG);
+	NULL_CHK_HR(pDstBuffer, E_INVALIDARG);
+
+	// TODO: bounds checks on buffers, should add size of buffers to function
+
+	const int numBytes = 4; // for RGBA
+	const bool bgra = false; // change to true to flip color values
+
+	for (int y = 0; y < height; y++)
+	{
+		auto yRow = yFlip ? pSrcBuffer + (height - 1 - y) * width : pSrcBuffer + y * stride;
+
+		auto dstRow = pDstBuffer + y * width * numBytes;
+
+		auto uvRow = pSrcBuffer + (height + (y >> 1)) * stride;
+		for (int x = 0; x < width; x++)
+		{
+			auto uvIndex = (x >> 1) << 1;
+
+			// Get YUV
+			byte Y = yRow[x];
+			byte U = uvRow[uvIndex + 0];
+			byte V = uvRow[uvIndex + 1];
+
+			// Conversion formula from http://msdn.microsoft.com/en-us/library/ms893078
+			// coefficients 
+			uint32_t C = Y - 16;
+			uint32_t D = U - 128;
+			uint32_t E = V - 128;
+
+			// intermediate results
+			uint32_t R = (298 * C           + 409 * E + 128) >> 8;
+			uint32_t G = (298 * C - 100 * D - 208 * E + 128) >> 8;
+			uint32_t B = (298 * C + 516 * D           + 128) >> 8;
+
+			// set values
+			dstRow[0] = std::clamp<byte>(static_cast<byte>(bgra ? B : R), 0, 255);
+			dstRow[1] = std::clamp<byte>(static_cast<byte>(G), 0, 255);
+			dstRow[2] = std::clamp<byte>(static_cast<byte>(bgra ? R : B), 0, 255);
+			if constexpr (numBytes == 4)
+			{
+				dstRow[3] = 0xff;
+			}
+
+			// next pixel
+			dstRow += numBytes;
+		}
+	}
+
+	return S_OK;
+}

@@ -65,8 +65,16 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         HRESULT OnEndOfStream();
 
         Capture::State State() { return m_currentState; }
-        Capture::PayloadHandler PayloadHandler() { return m_payloadHandler; }
-        void PayloadHandler(Capture::PayloadHandler const& value) { m_payloadHandler = value; }
+		CameraCapture::Media::PayloadHandler PayloadHandler() { return m_payloadHandler; }
+		void PayloadHandler(CameraCapture::Media::PayloadHandler const& value) 
+		{ 
+			m_payloadHandler = value; 
+		
+			if (m_payloadHandler != nullptr)
+			{
+				m_payloadHandler.QueueMediaProfile(m_mediaEncodingProfile);
+			}
+		}
 		Windows::Media::MediaProperties::MediaEncodingProfile EncodingProfile() { return m_mediaEncodingProfile; }
 
     private:
@@ -99,7 +107,7 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         std::list<com_ptr<IMFStreamSink>> m_streamSinks;
         com_ptr<IMFPresentationClock> m_presentationClock;
 
-        Capture::PayloadHandler m_payloadHandler;
+		CameraCapture::Media::PayloadHandler m_payloadHandler;
     };
 }
 

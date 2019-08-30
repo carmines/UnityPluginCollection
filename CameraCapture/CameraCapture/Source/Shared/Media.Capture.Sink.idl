@@ -4,7 +4,7 @@
 #pragma once
 
 import "Media.Capture.idl";
-import "Media.Capture.PayloadHandler.idl";
+import "Media.PayloadHandler.idl";
 
 namespace CameraCapture.Media.Capture
 {
@@ -18,7 +18,7 @@ namespace CameraCapture.Media.Capture
         HRESULT OnEndOfStream();
 
         State State { get; };
-        PayloadHandler PayloadHandler { get; set; };
+		CameraCapture.Media.PayloadHandler PayloadHandler { get; set; };
 		Windows.Media.MediaProperties.MediaEncodingProfile EncodingProfile{ get; };
     };
 }

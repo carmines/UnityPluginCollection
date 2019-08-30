@@ -62,6 +62,27 @@ struct CustomBuffer : winrt::implements<CustomBuffer, winrt::Windows::Storage::S
 	}
 };
 
+class CriticalSectionGuard
+{
+public:
+	CriticalSectionGuard(CRITICAL_SECTION& criticalSection) 
+		: m_criticalSection(criticalSection)
+	{
+		::EnterCriticalSection(&m_criticalSection);
+	}
+
+	~CriticalSectionGuard()
+	{
+		::LeaveCriticalSection(&m_criticalSection);
+	}
+
+private:
+	CriticalSectionGuard(const CriticalSectionGuard&) = delete;
+	CriticalSectionGuard& operator=(const CriticalSectionGuard&) = delete;
+
+	CRITICAL_SECTION& m_criticalSection;
+};
+
 inline void __stdcall Log(
     _In_ _Printf_format_string_ STRSAFE_LPCWSTR pszFormat,
     ...)

@@ -8,7 +8,7 @@
 #include "UnityDeviceResource.h"
 
 #include "Plugin.CaptureEngine.h"
-#include "Media.Capture.PayloadHandler.h"
+#include "Media.PayloadHandler.h"
 
 namespace impl
 {
@@ -200,7 +200,7 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStartPrevie
         hr = capture.StartPreview(width, height, enableAudio, enableMrc);
 		if (SUCCEEDED(hr))
 		{
-			capture.PayloadHandler(winrt::PayloadHandler());
+			capture.PayloadHandler(winrt::CameraCapture::Media::PayloadHandler());
 		}
     }
 

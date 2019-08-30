@@ -12,8 +12,8 @@
 struct SharedTexture : winrt::implements<SharedTexture, winrt::Windows::Foundation::IInspectable>
 {
     static HRESULT Create(
-        _In_ winrt::com_ptr<ID3D11Device> const& d3dDevice,
-        _In_ winrt::com_ptr<IMFDXGIDeviceManager> const& dxgiDeviceManager,
+        _In_ winrt::com_ptr<ID3D11Device> const d3dDevice,
+        _In_ winrt::com_ptr<IMFDXGIDeviceManager> const dxgiDeviceManager,
         _In_ uint32_t width,
         _In_ uint32_t height,
         _Out_ winrt::com_ptr<SharedTexture>& sharedTexture);
