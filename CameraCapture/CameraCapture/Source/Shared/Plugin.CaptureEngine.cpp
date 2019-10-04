@@ -292,84 +292,6 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
     return S_OK;
 }
 
-// private
-hresult CaptureEngine::CreateDeviceResources()
-{
-    if (m_mediaDevice != nullptr && m_dxgiDeviceManager != nullptr)
-    {
-        return S_OK;
-    }
-
-    // get the adapter from an existing d3dDevice
-    auto resources = m_d3d11DeviceResources.lock();
-    NULL_CHK_HR(resources, MF_E_UNEXPECTED);
-
-    com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
-    com_ptr<IDXGIDevice> dxgiDevice = resources->GetDevice().try_as<IDXGIDevice>();
-    if (dxgiDevice != nullptr)
-    {
-        IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
-    }
-
-    com_ptr<ID3D11Device> mediaDevice = nullptr;
-    IFR(CreateMediaDevice(dxgiAdapter.get(), mediaDevice.put()));
-
-    // create DXGIManager
-    uint32_t resetToken;
-    com_ptr<IMFDXGIDeviceManager> dxgiDeviceManager = nullptr;
-    IFR(MFCreateDXGIDeviceManager(&resetToken, dxgiDeviceManager.put()));
-
-    // associate device with dxgiManager
-    IFR(dxgiDeviceManager->ResetDevice(mediaDevice.get(), resetToken));
-
-    // success, store the values
-    m_mediaDevice.attach(mediaDevice.detach());
-    m_dxgiDeviceManager.attach(dxgiDeviceManager.detach());
-    m_resetToken = resetToken;
-
-    return S_OK;
-}
-
-void CaptureEngine::ReleaseDeviceResources()
-{
-    if (m_audioSample != nullptr)
-    {
-        m_audioSample = nullptr;
-    }
-
-    if (m_sharedVideoTexture != nullptr)
-    {
-        m_sharedVideoTexture->Reset();
-
-        m_sharedVideoTexture = nullptr;
-    }
-
-    if (m_sharedPhotoTexture != nullptr)
-    {
-        m_sharedPhotoTexture->Reset();
-
-        m_sharedPhotoTexture = nullptr;
-    }
-
-    if (m_dxgiDeviceManager != nullptr)
-    {
-        if (m_mediaDevice != nullptr)
-        {
-            m_dxgiDeviceManager->ResetDevice(nullptr, m_resetToken);
-
-            m_mediaDevice = nullptr;
-        }
-
-        m_dxgiDeviceManager = nullptr;
-    }
-
-    if (m_mediaDevice != nullptr)
-    {
-        m_mediaDevice = nullptr;
-    }
-}
-
-
 CameraCapture::Media::PayloadHandler CaptureEngine::PayloadHandler()
 {
     auto guard = m_cs.Guard();
@@ -533,6 +455,84 @@ void CaptureEngine::AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoo
 }
 
 
+// private
+hresult CaptureEngine::CreateDeviceResources()
+{
+    if (m_mediaDevice != nullptr && m_dxgiDeviceManager != nullptr)
+    {
+        return S_OK;
+    }
+
+    // get the adapter from an existing d3dDevice
+    auto resources = m_d3d11DeviceResources.lock();
+    NULL_CHK_HR(resources, MF_E_UNEXPECTED);
+
+    com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
+    com_ptr<IDXGIDevice> dxgiDevice = resources->GetDevice().try_as<IDXGIDevice>();
+    if (dxgiDevice != nullptr)
+    {
+        IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
+    }
+
+    com_ptr<ID3D11Device> mediaDevice = nullptr;
+    IFR(CreateMediaDevice(dxgiAdapter.get(), mediaDevice.put()));
+
+    // create DXGIManager
+    uint32_t resetToken;
+    com_ptr<IMFDXGIDeviceManager> dxgiDeviceManager = nullptr;
+    IFR(MFCreateDXGIDeviceManager(&resetToken, dxgiDeviceManager.put()));
+
+    // associate device with dxgiManager
+    IFR(dxgiDeviceManager->ResetDevice(mediaDevice.get(), resetToken));
+
+    // success, store the values
+    m_mediaDevice.attach(mediaDevice.detach());
+    m_dxgiDeviceManager.attach(dxgiDeviceManager.detach());
+    m_resetToken = resetToken;
+
+    return S_OK;
+}
+
+void CaptureEngine::ReleaseDeviceResources()
+{
+    if (m_audioSample != nullptr)
+    {
+        m_audioSample = nullptr;
+    }
+
+    if (m_sharedVideoTexture != nullptr)
+    {
+        m_sharedVideoTexture->Reset();
+
+        m_sharedVideoTexture = nullptr;
+    }
+
+    if (m_sharedPhotoTexture != nullptr)
+    {
+        m_sharedPhotoTexture->Reset();
+
+        m_sharedPhotoTexture = nullptr;
+    }
+
+    if (m_dxgiDeviceManager != nullptr)
+    {
+        if (m_mediaDevice != nullptr)
+        {
+            m_dxgiDeviceManager->ResetDevice(nullptr, m_resetToken);
+
+            m_mediaDevice = nullptr;
+        }
+
+        m_dxgiDeviceManager = nullptr;
+    }
+
+    if (m_mediaDevice != nullptr)
+    {
+        m_mediaDevice = nullptr;
+    }
+}
+
+
 IAsyncAction CaptureEngine::StartPreviewCoroutine(
     uint32_t width, uint32_t height,
     boolean enableAudio, boolean enableMrc)
@@ -682,18 +682,20 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
     co_await calling_thread;
 }
 
+
 IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine(
     uint32_t const width,
     uint32_t const height,
     boolean const enableMrc)
 {
-    auto strong = get_strong();
-
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
 
-    CreateMediaCaptureAsync(width, height, false);
+    if (m_mediaCapture == nullptr)
+    {
+        co_await CreateMediaCaptureAsync(width, height, false);
+    }
 
     auto captureSettings = m_mediaCapture.MediaCaptureSettings();
 
@@ -701,7 +703,6 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
 
     if (enableMrc)
     {
-
         try
         {
             auto mrcVideoEffect = Media::Capture::MrcVideoEffect();
@@ -757,10 +758,17 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
         }
     }
 
-    if (characteristic == VideoDeviceCharacteristic::AllStreamsIndependent ||
-        characteristic != VideoDeviceCharacteristic::RecordPhotoStreamsIdentical)
+    try
     {
-        co_await m_mediaCapture.ClearEffectsAsync(MediaStreamType::Photo);
+        if (characteristic == VideoDeviceCharacteristic::AllStreamsIndependent ||
+            characteristic != VideoDeviceCharacteristic::RecordPhotoStreamsIdentical)
+        {
+            co_await m_mediaCapture.ClearEffectsAsync(MediaStreamType::Photo);
+        }
+    }
+    catch (hresult_error const& error)
+    {
+        Log(L"can't clear the mrc extension - %s", error.message().c_str());
     }
 
     co_await photoCapture.FinishAsync();
@@ -771,6 +779,7 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
 
     co_return payload;
 }
+
 
 IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     uint32_t const& width, 

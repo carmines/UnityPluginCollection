@@ -71,18 +71,7 @@ hresult Module::Failed()
     state.type = CallbackType::Failed;
 
     ZeroMemory(&state.value.failedState, sizeof(FAILED_STATE));
-
-    // make a copy of the message since Unity may need
-    static hstring errorMessege;
-    try
-    {
-        throw;
-    }
-    catch (hresult_error const& e)
-    {
-        errorMessege = e.message();
-        state.value.failedState.hresult = e.to_abi();
-    }
+    state.value.failedState.hresult = E_UNEXPECTED;
 
     auto gurad = m_cs.Guard();
 
