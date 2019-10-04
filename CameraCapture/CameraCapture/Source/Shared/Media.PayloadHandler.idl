@@ -1,0 +1,23 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+import "Media.Payload.idl";
+
+namespace CameraCapture.Media
+{
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    [version(1.0)]
+    runtimeclass PayloadHandler : CameraCapture.Media.IPayloadHandler, Windows.Foundation.IClosable
+    {
+        PayloadHandler();
+
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaEncodingProfile> OnMediaProfile;
+        event Windows.Foundation.EventHandler<Payload> OnStreamPayload;
+        event Windows.Foundation.EventHandler<Windows.Media.Core.MediaStreamSample> OnStreamSample;
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaPropertySet> OnStreamMetadata;
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.IMediaEncodingProperties> OnStreamDescription;
+    };
+}

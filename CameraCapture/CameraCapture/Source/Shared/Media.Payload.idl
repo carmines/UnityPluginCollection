@@ -1,0 +1,31 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+namespace CameraCapture.Media
+{
+    [version(1.0), uuid(43401b9d-bb76-4348-b1b5-46255998278f)]
+    interface IPayloadHandler : IInspectable
+    {
+        HRESULT QueueEncodingProfile(
+            [in] Windows.Media.MediaProperties.MediaEncodingProfile* mediaProfile);
+        HRESULT QueueMetadata(
+            [in] Windows.Media.MediaProperties.MediaPropertySet* metaData);
+        HRESULT QueueEncodingProperties(
+            [in] Windows.Media.MediaProperties.IMediaEncodingProperties* mediaDescription);
+        HRESULT QueuePayload(
+            [in] CameraCapture.Media.Payload* payload);
+    };
+
+    [marshaling_behavior(agile)]
+    [version(1.0)]
+    runtimeclass Payload
+    {
+        Payload();
+        
+        Windows.Media.MediaProperties.MediaPropertySet MediaPropertySet{ get; };
+        Windows.Media.MediaProperties.IMediaEncodingProperties EncodingProperties{ get; };
+        Windows.Media.Core.MediaStreamSample MediaStreamSample{ get; };
+    }
+}

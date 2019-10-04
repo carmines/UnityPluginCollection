@@ -30,6 +30,7 @@ namespace CameraCapture
             PreviewStopped,
             PreviewAudioFrame,
             PreviewVideoFrame,
+            PhotoFrame,
         };
 
         [StructLayout(LayoutKind.Sequential)]

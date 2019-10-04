@@ -16,8 +16,8 @@
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.MrcAudioEffect.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Payload.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Capture.StreamSink.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.Functions.h" />
@@ -38,8 +38,8 @@
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.MrcAudioEffect.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Payload.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Capture.StreamSink.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.Functions.cpp" />
@@ -60,8 +60,8 @@
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.idl" />
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.MrcAudioEffect.idl" />
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.MrcVideoEffect.idl" />
-    <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.Payload.idl" />
-    <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.PayloadHandler.idl" />
+    <Midl Include="$(MSBuildThisFileDirectory)Media.Payload.idl" />
+    <Midl Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.idl" />
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.Sink.idl" />
     <Midl Include="$(MSBuildThisFileDirectory)Media.Capture.StreamSink.idl" />
     <Midl Include="$(MSBuildThisFileDirectory)Plugin.CaptureEngine.idl" />

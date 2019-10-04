@@ -29,11 +29,10 @@ winrt::Windows::Media::MediaProperties::IMediaEncodingProperties GetVideoDeviceP
     _In_ winrt::hstring subType);
 
 winrt::Windows::Media::Core::MediaStreamSource CreateMediaSource(
-	_In_ winrt::Windows::Media::MediaProperties::MediaEncodingProfile const& encodingProfile);
+    _In_ winrt::Windows::Media::MediaProperties::MediaEncodingProfile const& encodingProfile);
 
-HRESULT CopyAttributesToMediaStreamSample(
-	winrt::com_ptr<IMFAttributes> const& attributes,
-	winrt::Windows::Media::Core::MediaStreamSample const& sample);
+winrt::Windows::Foundation::IInspectable ConvertProperty(
+    _In_ PROPVARIANT const& var);
 
 HRESULT GetSurfaceFromTexture(
     _In_ ID3D11Texture2D* pTexture,
@@ -43,3 +42,15 @@ HRESULT CopySample(
     _In_ GUID majorType,
     _In_ winrt::com_ptr<IMFSample> const& srcSample,
     _In_ winrt::com_ptr<IMFSample> const& dstSample);
+
+HRESULT GetDXGISurfaceFromSample(
+    _In_ winrt::com_ptr<IMFSample> const& mediaSample,
+    _Inout_ winrt::com_ptr<IDXGISurface2>& dxgiSurface);
+
+HRESULT CreateMediaStreamSample(
+    _In_ winrt::com_ptr<IMFSample> const& mediaSample, 
+    _In_ winrt::Windows::Foundation::TimeSpan const& timeStamp, 
+    _Out_ winrt::Windows::Media::Core::MediaStreamSample& streamSample);
+_Use_decl_annotations_
+
+

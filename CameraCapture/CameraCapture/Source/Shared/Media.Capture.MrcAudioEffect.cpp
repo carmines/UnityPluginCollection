@@ -11,11 +11,12 @@ using namespace CameraCapture::Media::Capture::implementation;
 MrcAudioEffect::MrcAudioEffect()
     : m_propertySet() 
 {
+    MixerMode(DefaultAudioMixerMode);
 }
 
 hstring MrcAudioEffect::ActivatableClassId()
 {
-    return GetRuntimeClassName();
+    return hstring(L"Windows.Media.MixedRealityCapture.MixedRealityCaptureAudioEffect");
 }
 
 Windows::Foundation::Collections::IPropertySet MrcAudioEffect::Properties()

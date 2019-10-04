@@ -12,11 +12,18 @@ using namespace Windows::Media::Capture;
 MrcVideoEffect::MrcVideoEffect()
     : m_propertySet()
 {
+    // Set Default values
+    StreamType(DefaultStreamType);
+    HologramCompositionEnabled(DefaultHologramCompositionEnabled);
+    RecordingIndicatorEnabled(DefaultRecordingIndicatorEnabled);
+    VideoStabilizationEnabled(DefaultVideoStabilizationEnabled);
+    VideoStabilizationBufferLength(15);
+    GlobalOpacityCoefficient(DefaultGlobalOpacityCoefficient);
 }
 
 hstring MrcVideoEffect::ActivatableClassId()
 {
-    return GetRuntimeClassName();
+    return hstring(L"Windows.Media.MixedRealityCapture.MixedRealityCaptureVideoEffect");
 }
 
 Windows::Foundation::Collections::IPropertySet MrcVideoEffect::Properties()
@@ -36,7 +43,6 @@ float MrcVideoEffect::GlobalOpacityCoefficient()
 }
 void MrcVideoEffect::GlobalOpacityCoefficient(float value)
 {
-    //m_propertySet.Insert(PROPERTY_GLOBALOPACITYCOEFFICIENT, PropertyValue::CreateSingle(value));
     m_propertySet.Insert(PROPERTY_GLOBALOPACITYCOEFFICIENT, box_value<float>(value));
 }
 

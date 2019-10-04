@@ -4,21 +4,21 @@
 #pragma once
 
 import "Media.Capture.idl";
-import "Media.Capture.PayloadHandler.idl";
+import "Media.PayloadHandler.idl";
 
 namespace CameraCapture.Media.Capture
 {
     [version(1.0)]
     [marshaling_behavior(agile)]
     [threading(both)]
-    runtimeclass Sink : Windows.Media.IMediaExtension
+    runtimeclass Sink : CameraCapture.Media.IPayloadHandler, Windows.Media.IMediaExtension
     {
         Sink(Windows.Media.MediaProperties.MediaEncodingProfile encodingProfile);
 
         HRESULT OnEndOfStream();
 
         State State { get; };
-        PayloadHandler PayloadHandler { get; set; };
-		Windows.Media.MediaProperties.MediaEncodingProfile EncodingProfile{ get; };
+        CameraCapture.Media.PayloadHandler PayloadHandler { get; set; };
+        Windows.Media.MediaProperties.MediaEncodingProfile EncodingProfile{ get; };
     };
 }
