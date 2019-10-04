@@ -30,8 +30,7 @@ CameraCapture::Plugin::Module CaptureEngine::Create(
     StateChangedCallback fnCallback,
     void* pCallbackObject)
 {
-    auto capture = make<CaptureEngine>();
-
+    auto capture = CameraCapture::Plugin::CaptureEngine();
     if (SUCCEEDED(capture.as<IModulePriv>()->Initialize(unityDevice, fnCallback, pCallbackObject)))
     {
         return capture;
@@ -42,19 +41,20 @@ CameraCapture::Plugin::Module CaptureEngine::Create(
 
 
 CaptureEngine::CaptureEngine()
-	: m_isShutdown(false)
-	, m_startPreviewEventHandle(CreateEvent(nullptr, true, true, nullptr))
-	, m_stopPreviewEventHandle(CreateEvent(nullptr, true, true, nullptr))
+    : m_isShutdown(false)
+    , m_startPreviewEventHandle(CreateEvent(nullptr, true, true, nullptr))
+    , m_stopPreviewEventHandle(CreateEvent(nullptr, true, true, nullptr))
+    , m_takePhotoEventHandle(CreateEvent(nullptr, true, true, nullptr))
     , m_mediaDevice(nullptr)
-	, m_dxgiDeviceManager(nullptr)
-	, m_category(MediaCategory::Communications)
-	, m_streamType(MediaStreamType::VideoPreview)
-	, m_videoProfile(KnownVideoProfile::VideoConferencing)
-	, m_sharingMode(MediaCaptureSharingMode::ExclusiveControl)
+    , m_dxgiDeviceManager(nullptr)
+    , m_category(MediaCategory::Communications)
+    , m_streamType(MediaStreamType::VideoPreview)
+    , m_videoProfile(KnownVideoProfile::VideoConferencing)
+    , m_sharingMode(MediaCaptureSharingMode::ExclusiveControl)
     , m_startPreviewOp(nullptr)
     , m_stopPreviewOp(nullptr)
-	, m_mediaCapture(nullptr)
-	, m_initSettings(nullptr)
+    , m_mediaCapture(nullptr)
+    , m_initSettings(nullptr)
 	, m_mrcAudioEffect(nullptr)
     , m_mrcVideoEffect(nullptr)
     , m_mrcPreviewEffect(nullptr)
@@ -62,19 +62,14 @@ CaptureEngine::CaptureEngine()
     , m_payloadHandler(nullptr)
     , m_audioSample(nullptr)
     , m_sharedVideoTexture(nullptr)
+    , m_sharedPhotoTexture(nullptr)
     , m_appCoordinateSystem(nullptr)
 {
-	InitializeCriticalSection(&m_cs);
-}
-
-CaptureEngine::~CaptureEngine()
-{
-	DeleteCriticalSection(&m_cs);
 }
 
 void CaptureEngine::Shutdown()
 {
-	auto guard = CriticalSectionGuard(m_cs);
+    auto guard = m_cs.Guard();
 
     if (m_isShutdown)
     {
@@ -82,52 +77,69 @@ void CaptureEngine::Shutdown()
     }
     m_isShutdown = true;
 
-	// see if any outstanding operations are running
+    // see if any outstanding operations are running
     if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
     {
-		concurrency::create_task([this]()
-			{
-				WaitForSingleObject(m_startPreviewEventHandle.get(), INFINITE);
-			}).get();
-	}
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_startPreviewEventHandle.get(), INFINITE);
+            }).get();
+    }
 
-	if (m_mediaCapture != nullptr)
-	{
-		StopPreview();
-	}
+    if (m_takePhotoOp != nullptr && m_takePhotoOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_takePhotoEventHandle.get(), INFINITE);
+            }).get();
+    }
 
-	if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
-	{
-		concurrency::create_task([this]()
-			{
-				WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
-			}).get();
-	}
+    if (m_mediaCapture != nullptr)
+    {
+        StopPreview();
+    }
 
-	ReleaseDeviceResources();
+    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
+            }).get();
+    }
+
+    if (m_mediaSink != nullptr)
+    {
+        auto mfSink = m_mediaSink.try_as<IMFMediaSink>();
+        if (mfSink != nullptr)
+        {
+            mfSink->Shutdown();
+        }
+
+        m_mediaSink = nullptr;
+    }
+
+    ReleaseDeviceResources();
 
     Module::Shutdown();
 }
 
 hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc)
 {
-	auto guard = CriticalSectionGuard(m_cs);
+    auto guard = m_cs.Guard();
 
-	if (m_startPreviewOp != nullptr || m_stopPreviewOp != nullptr)
-	{
-		IFR(E_ABORT);
-	}
-
-	ResetEvent(m_startPreviewEventHandle.get());
-
-	IFR(CreateDeviceResources());
-
-	m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([this](auto const asyncOp, AsyncStatus const status)
+    if (m_startPreviewOp != nullptr)
     {
-        UNREFERENCED_PARAMETER(asyncOp);
+        IFR(E_ABORT);
+    }
 
-		auto guard = CriticalSectionGuard(m_cs);
+    ResetEvent(m_startPreviewEventHandle.get());
+
+    IFR(CreateDeviceResources());
+
+    m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
+    m_startPreviewOp.Completed([this, strong = get_strong()](auto&& /*sender*/, auto&& status)
+    {
+        auto guard = m_cs.Guard();
 
         m_startPreviewOp = nullptr;
 
@@ -155,23 +167,21 @@ hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 
 hresult CaptureEngine::StopPreview()
 {
-	auto guard = CriticalSectionGuard(m_cs);
+    auto guard = m_cs.Guard();
 
-	if (m_startPreviewOp != nullptr || m_stopPreviewOp != nullptr)
-	{
-		IFR(E_ABORT);
-	}
-
-	ResetEvent(m_stopPreviewEventHandle.get());
-
-	m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([this](auto const asyncOp, AsyncStatus const status)
+    if (m_stopPreviewOp != nullptr)
     {
-        UNREFERENCED_PARAMETER(asyncOp);
+        IFR(E_ABORT);
+    }
 
-		auto guard = CriticalSectionGuard(m_cs);
+    ResetEvent(m_stopPreviewEventHandle.get());
 
-		m_stopPreviewOp = nullptr;
+    m_stopPreviewOp = StopPreviewCoroutine();
+    m_stopPreviewOp.Completed([this, strong = get_strong()](auto&& /*sender*/, auto&& status)
+    {
+        auto guard = m_cs.Guard();
+
+        m_stopPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
@@ -195,6 +205,93 @@ hresult CaptureEngine::StopPreview()
     return S_OK;
 }
 
+hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc)
+{
+    auto guard = m_cs.Guard();
+
+    if (m_takePhotoOp)
+    {
+        IFR(E_ABORT);
+    }
+
+    ResetEvent(m_takePhotoEventHandle.get());
+
+    IFR(CreateDeviceResources());
+
+    m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc);
+    m_takePhotoOp.Completed([this, strong = get_strong()](auto const& result, auto&& status)
+    {
+        auto guard = m_cs.Guard();
+
+        m_takePhotoOp = nullptr;
+
+        if (status == AsyncStatus::Error)
+        {
+            Failed();
+        }
+        else if (status == AsyncStatus::Completed)
+        {
+            CALLBACK_STATE state{};
+            ZeroMemory(&state, sizeof(CALLBACK_STATE));
+
+            state.type = CallbackType::Capture;
+
+            ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
+
+            state.value.captureState.stateType = CaptureStateType::PhotoFrame;
+
+            auto payload = result.GetResults();
+            if (payload != nullptr)
+            {
+                auto streamSample = payload.as<IStreamSample>();
+                if (streamSample != nullptr)
+                {
+                    auto videoProps = payload.EncodingProperties().as<ImageEncodingProperties>();
+
+                    if (m_sharedPhotoTexture == nullptr
+                        ||
+                        m_sharedPhotoTexture->frameTexture == nullptr
+                        ||
+                        m_sharedPhotoTexture->frameTextureDesc.Width != videoProps.Width()
+                        ||
+                        m_sharedPhotoTexture->frameTextureDesc.Height != videoProps.Height())
+                    {
+                        auto resources = m_d3d11DeviceResources.lock();
+                        NULL_CHK_R(resources);
+
+                        // make sure we have created our own d3d device
+                        IFV(CreateDeviceResources());
+
+                        IFV(SharedTexture::Create(resources->GetDevice(), m_dxgiDeviceManager, videoProps.Width(), videoProps.Height(), m_sharedPhotoTexture));
+                    }
+
+                    // copy the data
+                    IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_sharedPhotoTexture->mediaSample));
+
+                    // Set state values
+                    state.value.captureState.width = m_sharedPhotoTexture->frameTextureDesc.Width;
+                    state.value.captureState.height = m_sharedPhotoTexture->frameTextureDesc.Height;
+                    state.value.captureState.texturePtr = m_sharedPhotoTexture->frameTextureSRV.get();
+
+                    // if there is transform change, update matricies
+                    if (m_appCoordinateSystem != nullptr)
+                    {
+                        if (SUCCEEDED(m_sharedPhotoTexture->UpdateTransforms(m_appCoordinateSystem)))
+                        {
+                            state.value.captureState.worldMatrix = m_sharedPhotoTexture->cameraToWorldTransform;
+                            state.value.captureState.projectionMatrix = m_sharedPhotoTexture->cameraProjectionMatrix;
+                        }
+                    }
+                }
+            }
+
+            Callback(state);
+        }
+    });
+
+    return S_OK;
+}
+
 // private
 hresult CaptureEngine::CreateDeviceResources()
 {
@@ -203,15 +300,16 @@ hresult CaptureEngine::CreateDeviceResources()
         return S_OK;
     }
 
-	// get the adapter from the Unity device
+    // get the adapter from an existing d3dDevice
     auto resources = m_d3d11DeviceResources.lock();
     NULL_CHK_HR(resources, MF_E_UNEXPECTED);
 
-	com_ptr<IDXGIDevice> dxgiDevice = nullptr;
-	IFR(resources->GetDevice()->QueryInterface(guid_of<IDXGIDevice>(), dxgiDevice.put_void()));
-
     com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
-    IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
+    com_ptr<IDXGIDevice> dxgiDevice = resources->GetDevice().try_as<IDXGIDevice>();
+    if (dxgiDevice != nullptr)
+    {
+        IFR(dxgiDevice->GetAdapter(dxgiAdapter.put()));
+    }
 
     com_ptr<ID3D11Device> mediaDevice = nullptr;
     IFR(CreateMediaDevice(dxgiAdapter.get(), mediaDevice.put()));
@@ -246,8 +344,22 @@ void CaptureEngine::ReleaseDeviceResources()
         m_sharedVideoTexture = nullptr;
     }
 
+    if (m_sharedPhotoTexture != nullptr)
+    {
+        m_sharedPhotoTexture->Reset();
+
+        m_sharedPhotoTexture = nullptr;
+    }
+
     if (m_dxgiDeviceManager != nullptr)
     {
+        if (m_mediaDevice != nullptr)
+        {
+            m_dxgiDeviceManager->ResetDevice(nullptr, m_resetToken);
+
+            m_mediaDevice = nullptr;
+        }
+
         m_dxgiDeviceManager = nullptr;
     }
 
@@ -260,324 +372,234 @@ void CaptureEngine::ReleaseDeviceResources()
 
 CameraCapture::Media::PayloadHandler CaptureEngine::PayloadHandler()
 {
-	auto guard = CriticalSectionGuard(m_cs);
+    auto guard = m_cs.Guard();
 
-	return m_payloadHandler;
+    return m_payloadHandler;
 }
 void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& value)
 {
-	auto guard = CriticalSectionGuard(m_cs);
+    auto guard = m_cs.Guard();
 
-	ResetPayloadHandler();
+    m_payloadHandler = value;
 
-	m_payloadHandler = value;
+    if (m_mediaSink != nullptr)
+    {
+        m_mediaSink.PayloadHandler(m_payloadHandler);
+    }
 
-	if (m_mediaSink != nullptr)
-	{
-		m_mediaSink.PayloadHandler(m_payloadHandler);
-	}
+    m_payloadEventRevoker = m_payloadHandler.OnStreamPayload(winrt::auto_revoke, [this, strong = get_strong()](auto const sender, Media::Payload const& payload)
+        {
+            UNREFERENCED_PARAMETER(sender);
 
-	m_profileEventToken = m_payloadHandler.OnMediaProfile([this](auto const sender, MediaEncodingProfile const& profile)
-		{
-			UNREFERENCED_PARAMETER(sender);
+            if (m_isShutdown)
+            {
+                return;
+            }
 
-			if (m_isShutdown)
-			{
-				return;
-			}
+            if (sender != m_payloadHandler)
+            {
+                return;
+            }
 
-			bool hasAudio = false;
-			if (profile.Audio() != nullptr)
-			{
-				hasAudio = true;
-			}
+            if (payload == nullptr)
+            {
+                return;
+            }
 
-			bool hasVideo = false;
-			if (profile.Video() != nullptr)
-			{
-				hasVideo = true;
-			}
+            GUID majorType = GUID_NULL;
 
-			Log(L"Has Audio: %s, Has Video: %s\n",
-				hasAudio ? L"Yes" : L"No",
-				hasVideo ? L"Yes" : L"No");
-		});
+            auto mediaStreamSample = payload.MediaStreamSample();
+            if (mediaStreamSample != nullptr)
+            {
+                auto type = mediaStreamSample.ExtendedProperties().TryLookup(MF_MT_MAJOR_TYPE);
+                if (type != nullptr)
+                {
+                    majorType = winrt::unbox_value<guid>(type);
+                }
+            }
 
-	m_streamDescriptionEventToken = m_payloadHandler.OnStreamDescription([this](auto const sender, IMediaEncodingProperties const& description)
-		{
-			UNREFERENCED_PARAMETER(sender);
-			UNREFERENCED_PARAMETER(description);
+            auto streamSample = payload.as<IStreamSample>();
+            if (streamSample == nullptr)
+            {
+                return;
+            }
 
-			if (m_isShutdown)
-			{
-				return;
-			}
-		});
+            if (MFMediaType_Audio == majorType)
+            {
+                if (m_audioSample == nullptr)
+                {
+                    DWORD bufferSize = 0;
+                    IFV(streamSample->Sample()->GetTotalLength(&bufferSize));
 
-	m_streamMetaDataEventToken = m_payloadHandler.OnStreamMetadata([this](auto const sender, MediaPropertySet const& metaData)
-		{
-			UNREFERENCED_PARAMETER(sender);
+                    com_ptr<IMFMediaBuffer> dstBuffer = nullptr;
+                    IFV(MFCreateMemoryBuffer(bufferSize, dstBuffer.put()));
 
-			if (m_isShutdown)
-			{
-				return;
-			}
+                    com_ptr<IMFSample> dstSample = nullptr;
+                    IFV(MFCreateSample(dstSample.put()));
 
-			auto payloadType = metaData.TryLookup(MF_PAYLOAD_MARKER_TYPE);
-			if (payloadType != nullptr)
-			{
-				auto type = static_cast<MFSTREAMSINK_MARKER_TYPE>(unbox_value<uint32_t>(payloadType));
-				if (type == MFSTREAMSINK_MARKER_TYPE::MFSTREAMSINK_MARKER_ENDOFSEGMENT)
-				{
-					// notify End of Segment
-					Log(L"End of Segment\n");
-				}
-				else if (type == MFSTREAMSINK_MARKER_TYPE::MFSTREAMSINK_MARKER_TICK)
-				{
-					auto timestamp = unbox_value<int64_t>(metaData.Lookup(MF_PAYLOAD_MARKER_TICK_TIMESTAMP));
+                    IFV(dstSample->AddBuffer(dstBuffer.get()));
 
-					Log(L"Tick: %d\n", timestamp);
-				}
-			}
+                    m_audioSample.attach(dstSample.detach());
+                }
 
-			auto flushType = metaData.TryLookup(MF_PAYLOAD_FLUSH);
-			if (flushType != nullptr)
-			{
-				Log(L"Flush\n");
-			}
-		});
+                IFV(CopySample(MFMediaType_Audio, streamSample->Sample(), m_audioSample));
 
-	m_streamSampleEventToken = m_payloadHandler.OnStreamSample([this](auto const sender, MediaStreamSample const& description)
-		{
-			UNREFERENCED_PARAMETER(sender);
-			UNREFERENCED_PARAMETER(description);
+                CALLBACK_STATE state{};
+                ZeroMemory(&state, sizeof(CALLBACK_STATE));
 
-			if (m_isShutdown)
-			{
-				return;
-			}
+                state.type = CallbackType::Capture;
 
-		});
+                ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
 
-	m_streamSampleEventToken = m_payloadHandler.OnStreamPayload([this](auto const sender, Media::Payload const& payload)
-		{
-			UNREFERENCED_PARAMETER(sender);
+                state.value.captureState.stateType = CaptureStateType::PreviewAudioFrame;
+                //state.value.captureState.width = 0;
+                //state.value.captureState.height = 0;
+                //state.value.captureState.texturePtr = nullptr;
+                Callback(state);
+            }
+            else if (MFMediaType_Video == majorType)
+            {
+                boolean bufferChanged = false;
 
-			if (m_isShutdown)
-			{
-				return;
-			}
+                auto videoProps = payload.EncodingProperties().as<IVideoEncodingProperties>();
 
-			if (sender != m_payloadHandler)
-			{
-				return;
-			}
+                if (m_sharedVideoTexture == nullptr
+                    ||
+                    m_sharedVideoTexture->frameTexture == nullptr
+                    ||
+                    m_sharedVideoTexture->frameTextureDesc.Width != videoProps.Width()
+                    ||
+                    m_sharedVideoTexture->frameTextureDesc.Height != videoProps.Height())
+                {
+                    auto resources = m_d3d11DeviceResources.lock();
+                    NULL_CHK_R(resources);
 
-			if (payload == nullptr)
-			{
-				return;
-			}
+                    // make sure we have created our own d3d device
+                    IFV(CreateDeviceResources());
 
-			GUID majorType = GUID_NULL;
+                    IFV(SharedTexture::Create(resources->GetDevice(), m_dxgiDeviceManager, videoProps.Width(), videoProps.Height(), m_sharedVideoTexture));
 
-			auto mediaStreamSample = payload.MediaStreamSample();
-			if (mediaStreamSample != nullptr)
-			{
-				auto type = mediaStreamSample.ExtendedProperties().TryLookup(MF_MT_MAJOR_TYPE);
-				if (type != nullptr)
-				{
-					majorType = winrt::unbox_value<guid>(type);
-				}
-			}
+                    bufferChanged = true;
+                }
 
-			auto streamSample = payload.as<IStreamSample>();
-			if (streamSample == nullptr)
-			{
-				return;
-			}
+                // copy the data
+                IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_sharedVideoTexture->mediaSample));
 
-			if (MFMediaType_Audio == majorType)
-			{
-				if (m_audioSample == nullptr)
-				{
-					DWORD bufferSize = 0;
-					IFV(streamSample->Sample()->GetTotalLength(&bufferSize));
+                // did the texture description change, if so, raise callback
+                CALLBACK_STATE state{};
+                ZeroMemory(&state, sizeof(CALLBACK_STATE));
 
-					com_ptr<IMFMediaBuffer> dstBuffer = nullptr;
-					IFV(MFCreateMemoryBuffer(bufferSize, dstBuffer.put()));
+                state.type = CallbackType::Capture;
 
-					com_ptr<IMFSample> dstSample = nullptr;
-					IFV(MFCreateSample(dstSample.put()));
+                ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
 
-					IFV(dstSample->AddBuffer(dstBuffer.get()));
+                state.value.captureState.stateType = CaptureStateType::PreviewVideoFrame;
+                state.value.captureState.width = m_sharedVideoTexture->frameTextureDesc.Width;
+                state.value.captureState.height = m_sharedVideoTexture->frameTextureDesc.Height;
+                state.value.captureState.texturePtr = m_sharedVideoTexture->frameTextureSRV.get();
 
-					m_audioSample.attach(dstSample.detach());
-				}
+                // if there is transform change, update matricies
+                if (m_appCoordinateSystem != nullptr)
+                {
+                    if (SUCCEEDED(m_sharedVideoTexture->UpdateTransforms(m_appCoordinateSystem)))
+                    {
+                        state.value.captureState.worldMatrix = m_sharedVideoTexture->cameraToWorldTransform;
+                        state.value.captureState.projectionMatrix = m_sharedVideoTexture->cameraProjectionMatrix;
 
-				IFV(CopySample(MFMediaType_Audio, streamSample->Sample(), m_audioSample));
+                        bufferChanged = true;
+                    }
+                }
 
-				CALLBACK_STATE state{};
-				ZeroMemory(&state, sizeof(CALLBACK_STATE));
-
-				state.type = CallbackType::Capture;
-
-				ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
-
-				state.value.captureState.stateType = CaptureStateType::PreviewAudioFrame;
-				//state.value.captureState.width = 0;
-				//state.value.captureState.height = 0;
-				//state.value.captureState.texturePtr = nullptr;
-				Callback(state);
-			}
-			else if (MFMediaType_Video == majorType)
-			{
-				boolean bufferChanged = false;
-
-				auto videoProps = payload.EncodingProperties().as<IVideoEncodingProperties>();
-
-				if (m_sharedVideoTexture == nullptr
-					||
-					m_sharedVideoTexture->frameTexture == nullptr
-					||
-					m_sharedVideoTexture->frameTextureDesc.Width != videoProps.Width()
-					||
-					m_sharedVideoTexture->frameTextureDesc.Height != videoProps.Height())
-				{
-					auto resources = m_d3d11DeviceResources.lock();
-					NULL_CHK_R(resources);
-
-					// make sure we have created our own d3d device
-					IFV(CreateDeviceResources());
-
-					IFV(SharedTexture::Create(resources->GetDevice(), m_dxgiDeviceManager, videoProps.Width(), videoProps.Height(), m_sharedVideoTexture));
-
-					bufferChanged = true;
-				}
-
-				// copy the data
-				IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_sharedVideoTexture->mediaSample));
-
-				// did the texture description change, if so, raise callback
-				CALLBACK_STATE state{};
-				ZeroMemory(&state, sizeof(CALLBACK_STATE));
-
-				state.type = CallbackType::Capture;
-
-				ZeroMemory(&state.value.captureState, sizeof(CAPTURE_STATE));
-
-				state.value.captureState.stateType = CaptureStateType::PreviewVideoFrame;
-				state.value.captureState.width = m_sharedVideoTexture->frameTextureDesc.Width;
-				state.value.captureState.height = m_sharedVideoTexture->frameTextureDesc.Height;
-				state.value.captureState.texturePtr = m_sharedVideoTexture->frameTextureSRV.get();
-
-				// if there is transform change, update matricies
-				if (m_appCoordinateSystem != nullptr)
-				{
-					if (SUCCEEDED(m_sharedVideoTexture->UpdateTransforms(m_appCoordinateSystem)))
-					{
-						state.value.captureState.worldMatrix = m_sharedVideoTexture->cameraToWorldTransform;
-						state.value.captureState.projectionMatrix = m_sharedVideoTexture->cameraProjectionMatrix;
-
-						bufferChanged = true;
-					}
-				}
-
-				if (bufferChanged)
-				{
-					Callback(state);
-				}
-			}
-		});
+                if (bufferChanged)
+                {
+                    Callback(state);
+                }
+            }
+        });
 }
 
 CameraCapture::Media::Capture::Sink CaptureEngine::MediaSink()
 {
-	auto guard = CriticalSectionGuard(m_cs);
-
-	return m_mediaSink;
+    return m_mediaSink;
 }
 
 Windows::Perception::Spatial::SpatialCoordinateSystem CaptureEngine::AppCoordinateSystem()
 {
-	auto guard = CriticalSectionGuard(m_cs);
-
-	return m_appCoordinateSystem;
+    return m_appCoordinateSystem;
 }
 void CaptureEngine::AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value)
 {
-	auto guard = CriticalSectionGuard(m_cs);
-
-	m_appCoordinateSystem = value;
+    m_appCoordinateSystem = value;
 }
 
 
 IAsyncAction CaptureEngine::StartPreviewCoroutine(
-    uint32_t const width, uint32_t const height,
-    boolean const enableAudio, boolean const enableMrc)
+    uint32_t width, uint32_t height,
+    boolean enableAudio, boolean enableMrc)
 {
-	winrt::apartment_context calling_thread;
+    winrt::apartment_context calling_thread;
 
     co_await resume_background();
 
-	{
-		auto guard = CriticalSectionGuard(m_cs);
+    {
+        auto guard = m_cs.Guard();
 
-		if (m_mediaCapture == nullptr)
-		{
-			co_await CreateMediaCaptureAsync(enableAudio, width, height);
-		}
-		else
-		{
-			co_await RemoveMrcEffectsAsync();
-		}
-	}
-	
-	// set video controller properties
-	auto videoController = m_mediaCapture.VideoDeviceController();
-	videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
+        if (m_mediaCapture == nullptr)
+        {
+            co_await CreateMediaCaptureAsync(width, height, enableAudio);
+        }
+        else
+        {
+            co_await RemoveMrcEffectsAsync();
+        }
+    }
+    
+    // set video controller properties
+    auto videoController = m_mediaCapture.VideoDeviceController();
+    videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
 
-	// override video controller media stream properties
-	if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
-	{
-		auto videoEncProps = GetVideoDeviceProperties(videoController, m_streamType, width, height, MediaEncodingSubtypes::Nv12());
-		co_await videoController.SetMediaStreamPropertiesAsync(m_streamType, videoEncProps);
+    // override video controller media stream properties
+    if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
+    {
+        auto videoEncProps = GetVideoDeviceProperties(videoController, m_streamType, width, height, MediaEncodingSubtypes::Nv12());
+        co_await videoController.SetMediaStreamPropertiesAsync(m_streamType, videoEncProps);
 
-		auto captureSettings = m_mediaCapture.MediaCaptureSettings();
-		if (m_streamType != MediaStreamType::VideoPreview
-			&&
-			captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::AllStreamsIdentical
-			&&
-			captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
-		{
-			videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoRecord, width, height, MediaEncodingSubtypes::Nv12());
-			co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoRecord, videoEncProps);
-		}
-	}
+        auto captureSettings = m_mediaCapture.MediaCaptureSettings();
+        if (m_streamType != MediaStreamType::VideoPreview
+            &&
+            captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::AllStreamsIdentical
+            &&
+            captureSettings.VideoDeviceCharacteristic() != VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
+        {
+            videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::VideoRecord, width, height, MediaEncodingSubtypes::Nv12());
+            co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::VideoRecord, videoEncProps);
+        }
+    }
 
-	// encoding profile based on 720p
+    // encoding profile based on 720p
     auto encodingProfile = MediaEncodingProfile::CreateMp4(VideoEncodingQuality::HD720p);
     encodingProfile.Container(nullptr);
 
-	// update the audio profile to match device
-	if (enableAudio)
-	{
-		auto audioController = m_mediaCapture.AudioDeviceController();
-		auto audioMediaProperties = audioController.GetMediaStreamProperties(MediaStreamType::Audio);
-		auto audioMediaProperty = audioMediaProperties.as<AudioEncodingProperties>();
+    // update the audio profile to match device
+    if (enableAudio)
+    {
+        auto audioController = m_mediaCapture.AudioDeviceController();
+        auto audioMediaProperties = audioController.GetMediaStreamProperties(MediaStreamType::Audio);
+        auto audioMediaProperty = audioMediaProperties.as<AudioEncodingProperties>();
 
-		encodingProfile.Audio().Bitrate(audioMediaProperty.Bitrate());
-		encodingProfile.Audio().BitsPerSample(audioMediaProperty.BitsPerSample());
-		encodingProfile.Audio().ChannelCount(audioMediaProperty.ChannelCount());
-		encodingProfile.Audio().SampleRate(audioMediaProperty.SampleRate());
-		if (m_streamType == MediaStreamType::VideoPreview) // for local playback only
-		{
-			encodingProfile.Audio().Subtype(MediaEncodingSubtypes::Float());
-		}
-	}
-	else
-	{
-		encodingProfile.Audio(nullptr);
-	}
+        encodingProfile.Audio().Bitrate(audioMediaProperty.Bitrate());
+        encodingProfile.Audio().BitsPerSample(audioMediaProperty.BitsPerSample());
+        encodingProfile.Audio().ChannelCount(audioMediaProperty.ChannelCount());
+        encodingProfile.Audio().SampleRate(audioMediaProperty.SampleRate());
+        if (m_streamType == MediaStreamType::VideoPreview) // for local playback only
+        {
+            encodingProfile.Audio().Subtype(MediaEncodingSubtypes::Float());
+        }
+    }
+    else
+    {
+        encodingProfile.Audio(nullptr);
+    }
 
     auto videoMediaProperty = videoController.GetMediaStreamProperties(m_streamType).as<VideoEncodingProperties>();
     if (videoMediaProperty != nullptr)
@@ -591,7 +613,7 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     }
 
     // media sink
-    auto mediaSink = make<Sink>(encodingProfile);
+    auto mediaSink = CameraCapture::Media::Capture::Sink(encodingProfile);
 
     // create mrc effects first
     if (enableMrc)
@@ -606,73 +628,154 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     else if (m_streamType == MediaStreamType::VideoPreview)
     {
         co_await m_mediaCapture.StartPreviewToCustomSinkAsync(encodingProfile, mediaSink);
-
-        auto previewFrame = co_await m_mediaCapture.GetPreviewFrameAsync();
     }
 
     // store locals
-	m_mediaSink = mediaSink;
+    m_mediaSink = mediaSink;
 
-	if (m_payloadHandler != nullptr)
-	{
-		m_mediaSink.PayloadHandler(m_payloadHandler);
-	}
+    if (m_payloadHandler != nullptr)
+    {
+        m_mediaSink.PayloadHandler(m_payloadHandler);
+    }
 
-	SetEvent(m_startPreviewEventHandle.get());
+    SetEvent(m_startPreviewEventHandle.get());
 
-	// if the calling thread has an outstanding call that is waiting, this will ASSERT
-	// TODO: refactor callback for plugin in a way this can be avoided
-	if (!m_isShutdown)
-	{
-		co_await calling_thread;
-	}
+    co_await calling_thread;
  }
 
 IAsyncAction CaptureEngine::StopPreviewCoroutine()
 {
-	winrt::apartment_context calling_thread;
+    auto strong = get_strong();
 
-	co_await resume_background();
+    winrt::apartment_context calling_thread;
 
-	ResetPayloadHandler();
+    co_await resume_background();
 
-	if (m_mediaSink != nullptr)
-	{
-		m_mediaSink.PayloadHandler(nullptr);
-		m_mediaSink = nullptr;
-	}
+    m_payloadEventRevoker.revoke();
 
-	if (m_mediaCapture != nullptr)
-	{
-		if (m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming)
-		{
-			if (m_streamType == MediaStreamType::VideoRecord)
-			{
-				co_await m_mediaCapture.StopRecordAsync();
-			}
-			else if (m_streamType == MediaStreamType::VideoPreview)
-			{
-				co_await m_mediaCapture.StopPreviewAsync();
-			}
-		}
-		co_await ReleaseMediaCaptureAsync();
-	}
+    m_payloadHandler = nullptr;
 
-	SetEvent(m_stopPreviewEventHandle.get());
+    if (m_mediaSink != nullptr)
+    {
+        m_mediaSink.PayloadHandler(nullptr);
+    }
 
-	// if the calling thread has an outstanding call that is waiting, this will ASSERT
-	// TODO: refactor callback for plugin in a way this can be avoided
-	if (!m_isShutdown)
-	{
-		co_await calling_thread;
-	}
+    if (m_mediaCapture != nullptr)
+    {
+        if (m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming)
+        {
+            if (m_streamType == MediaStreamType::VideoRecord)
+            {
+                co_await m_mediaCapture.StopRecordAsync();
+            }
+            else if (m_streamType == MediaStreamType::VideoPreview)
+            {
+                co_await m_mediaCapture.StopPreviewAsync();
+            }
+        }
+
+        co_await ReleaseMediaCaptureAsync();
+    }
+
+    SetEvent(m_stopPreviewEventHandle.get());
+
+    co_await calling_thread;
 }
 
+IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine(
+    uint32_t const width,
+    uint32_t const height,
+    boolean const enableMrc)
+{
+    auto strong = get_strong();
+
+    winrt::apartment_context calling_thread;
+
+    co_await resume_background();
+
+    CreateMediaCaptureAsync(width, height, false);
+
+    auto captureSettings = m_mediaCapture.MediaCaptureSettings();
+
+    auto characteristic = captureSettings.VideoDeviceCharacteristic();
+
+    if (enableMrc)
+    {
+
+        try
+        {
+            auto mrcVideoEffect = Media::Capture::MrcVideoEffect();
+            mrcVideoEffect.StreamType(MediaStreamType::Photo);
+
+            co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::Photo);
+        }
+        catch (hresult_error const& error)
+        {
+            Log(L"can't add the mrc extension - %s", error.message().c_str());
+        }
+    }
+
+    // set video controller properties
+    auto videoController = m_mediaCapture.VideoDeviceController();
+
+    // override video controller media stream properties
+    if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
+    {
+        // find the closest resolution
+        auto videoEncProps = GetVideoDeviceProperties(videoController, MediaStreamType::Photo, width, height, MediaEncodingSubtypes::Nv12());
+        co_await videoController.SetMediaStreamPropertiesAsync(MediaStreamType::Photo, videoEncProps);
+    }
+
+    auto photoProps = videoController.GetMediaStreamProperties(MediaStreamType::Photo).as<VideoEncodingProperties>();
+
+    auto encProperties = ImageEncodingProperties::CreateUncompressed(MediaPixelFormat::Bgra8);
+    encProperties.Width(photoProps.Width());
+    encProperties.Height(photoProps.Height());
+
+    auto photoCapture = co_await m_mediaCapture.PrepareLowLagPhotoCaptureAsync(encProperties);
+
+    auto capturedPhoto = co_await photoCapture.CaptureAsync();
+
+    auto frame = capturedPhoto.Frame();
+
+    Media::Payload payload = nullptr;
+
+    com_ptr<IMFGetService> spService = frame.try_as<IMFGetService>();
+    if (spService != nullptr)
+    {
+        com_ptr<IMFMediaType> mediaType = nullptr;
+        IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(encProperties), mediaType.put()));
+
+        com_ptr<IMFSample> spSample = nullptr;
+        IFT(spService->GetService(MF_WRAPPED_SAMPLE_SERVICE, __uuidof(IMFSample), spSample.put_void()));
+
+        payload = CameraCapture::Media::Payload();
+        auto streamSample = payload.try_as<IStreamSample>();
+        if (streamSample != nullptr)
+        {
+            IFT(streamSample->Sample(MFMediaType_Video, mediaType, spSample));
+        }
+    }
+
+    if (characteristic == VideoDeviceCharacteristic::AllStreamsIndependent ||
+        characteristic != VideoDeviceCharacteristic::RecordPhotoStreamsIdentical)
+    {
+        co_await m_mediaCapture.ClearEffectsAsync(MediaStreamType::Photo);
+    }
+
+    co_await photoCapture.FinishAsync();
+
+    SetEvent(m_takePhotoEventHandle.get());
+
+    co_await calling_thread;
+
+    co_return payload;
+}
 
 IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
-	boolean const& enableAudio, 
-	uint32_t const& width, 
-	uint32_t const& height)
+    uint32_t const& width, 
+    uint32_t const& height, 
+    boolean const& enableAudio)
 {
     if (m_mediaCapture != nullptr)
     {
@@ -680,112 +783,113 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     }
 
     auto audioDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::AudioCapture);
-	auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
+    auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
 
-	// initialize settings
-	auto initSettings = MediaCaptureInitializationSettings();
-	initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
-	initSettings.StreamingCaptureMode(enableAudio ? StreamingCaptureMode::AudioAndVideo : StreamingCaptureMode::Video);
-	initSettings.MediaCategory(m_category);
-	initSettings.VideoDeviceId(videoDevice.Id());
-	if (enableAudio)
-	{
-		initSettings.AudioDeviceId(audioDevice.Id());
-	}
+    // initialize settings
+    auto initSettings = MediaCaptureInitializationSettings();
+    initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
+    initSettings.StreamingCaptureMode(enableAudio ? StreamingCaptureMode::AudioAndVideo : StreamingCaptureMode::Video);
+    initSettings.MediaCategory(m_category);
+    initSettings.VideoDeviceId(videoDevice.Id());
+    if (enableAudio)
+    {
+        initSettings.AudioDeviceId(audioDevice.Id());
+    }
 
-	// which stream should photo capture use
-	if (m_streamType == MediaStreamType::VideoPreview)
-	{
-		initSettings.PhotoCaptureSource(PhotoCaptureSource::VideoPreview);
-	}
-	else
-	{
-		initSettings.PhotoCaptureSource(PhotoCaptureSource::Auto);
-	}
+    // which stream should photo capture use
+    if (m_streamType == MediaStreamType::VideoPreview)
+    {
+        initSettings.PhotoCaptureSource(PhotoCaptureSource::VideoPreview);
+    }
+    else
+    {
+        initSettings.PhotoCaptureSource(PhotoCaptureSource::Auto);
+    }
 
-	// set the DXGIManger for the media capture
-	auto advancedInitSettings = initSettings.as<IAdvancedMediaCaptureInitializationSettings>();
-	IFT(advancedInitSettings->SetDirectxDeviceManager(m_dxgiDeviceManager.get()));
+    // set the DXGIManger for the media capture
+    auto advancedInitSettings = initSettings.as<IAdvancedMediaCaptureInitializationSettings>();
+    IFT(advancedInitSettings->SetDirectxDeviceManager(m_dxgiDeviceManager.get()));
 
-	// if profiles are supported
-	if (MediaCapture::IsVideoProfileSupported(videoDevice.Id()))
-	{
-		initSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
+    // if profiles are supported
+    if (MediaCapture::IsVideoProfileSupported(videoDevice.Id()))
+    {
+        initSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
 
-		setlocale(LC_ALL, "");
+        setlocale(LC_ALL, "");
 
-		// set the profile / mediaDescription that matches
-		MediaCaptureVideoProfile videoProfile = nullptr;
-		MediaCaptureVideoProfileMediaDescription videoProfileMediaDescription = nullptr;
-		auto profiles = MediaCapture::FindKnownVideoProfiles(videoDevice.Id(), m_videoProfile);
-		for (auto const& profile : profiles)
-		{
-			auto const& videoProfileMediaDescriptions = m_streamType == (MediaStreamType::VideoPreview) ? profile.SupportedPreviewMediaDescription() : profile.SupportedRecordMediaDescription();
-			auto const& found = std::find_if(begin(videoProfileMediaDescriptions), end(videoProfileMediaDescriptions), [&](MediaCaptureVideoProfileMediaDescription const& desc)
-				{
-					Log(L"\tFormat: %s: %i x %i @ %f fps",
-						desc.Subtype().c_str(),
-						desc.Width(),
-						desc.Height(),
-						desc.FrameRate());
+        // set the profile / mediaDescription that matches
+        MediaCaptureVideoProfile videoProfile = nullptr;
+        MediaCaptureVideoProfileMediaDescription videoProfileMediaDescription = nullptr;
+        auto profiles = MediaCapture::FindKnownVideoProfiles(videoDevice.Id(), m_videoProfile);
+        for (auto const& profile : profiles)
+        {
+            auto const& videoProfileMediaDescriptions = m_streamType == (MediaStreamType::VideoPreview) ? profile.SupportedPreviewMediaDescription() : profile.SupportedRecordMediaDescription();
+            auto const& found = std::find_if(begin(videoProfileMediaDescriptions), end(videoProfileMediaDescriptions), [&](MediaCaptureVideoProfileMediaDescription const& desc)
+                {
+                    Log(L"\tFormat: %s: %i x %i @ %f fps",
+                        desc.Subtype().c_str(),
+                        desc.Width(),
+                        desc.Height(),
+                        desc.FrameRate());
 
-					// store a default
-					if (videoProfile == nullptr)
-					{
-						videoProfile = profile;
-					}
+                    // store a default
+                    if (videoProfile == nullptr)
+                    {
+                        videoProfile = profile;
+                    }
 
-					if (videoProfileMediaDescription == nullptr)
-					{
-						videoProfileMediaDescription = desc;
-					}
+                    if (videoProfileMediaDescription == nullptr)
+                    {
+                        videoProfileMediaDescription = desc;
+                    }
 
-					// select a size that will be == width/height @ 30fps, final size will be set with enc props
-					bool match =
-						_wcsicmp(desc.Subtype().c_str(), MediaEncodingSubtypes::Nv12().c_str()) == 0 &&
-						desc.Width() == width &&
-						desc.Height() == height &&
-						desc.FrameRate() == 30.0;
-					if (match)
-					{
-						Log(L" - found\n");
-					}
-					else
-					{
-						Log(L"\n");
-					}
+                    // select a size that will be == width/height @ 30fps, final size will be set with enc props
+                    bool match =
+                        _wcsicmp(desc.Subtype().c_str(), MediaEncodingSubtypes::Nv12().c_str()) == 0 &&
+                        desc.Width() == width &&
+                        desc.Height() == height &&
+                        desc.FrameRate() == 30.0;
+                    if (match)
+                    {
+                        Log(L" - found\n");
+                    }
+                    else
+                    {
+                        Log(L"\n");
+                    }
 
-					return match;
-				});
+                    return match;
+                });
 
-			if (found != end(videoProfileMediaDescriptions))
-			{
-				videoProfile = profile;
-				videoProfileMediaDescription = *found;
-				break;
-			}
-		}
+            if (found != end(videoProfileMediaDescriptions))
+            {
+                videoProfile = profile;
+                videoProfileMediaDescription = *found;
+                break;
+            }
+        }
 
-		initSettings.VideoProfile(videoProfile);
-		if (m_streamType == MediaStreamType::VideoPreview)
-		{
-			initSettings.PreviewMediaDescription(videoProfileMediaDescription);
-		}
-		else
-		{
-			initSettings.RecordMediaDescription(videoProfileMediaDescription);
-		}
-	}
-	else
-	{
-		initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
-	}
+        initSettings.VideoProfile(videoProfile);
+        if (m_streamType == MediaStreamType::VideoPreview)
+        {
+            initSettings.PreviewMediaDescription(videoProfileMediaDescription);
+        }
+        else
+        {
+            initSettings.RecordMediaDescription(videoProfileMediaDescription);
+        }
+        initSettings.PhotoMediaDescription(videoProfileMediaDescription);
+    }
+    else
+    {
+        initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
+    }
 
     auto mediaCapture = Windows::Media::Capture::MediaCapture();
     co_await mediaCapture.InitializeAsync(initSettings);
 
     m_mediaCapture = mediaCapture;
-	m_initSettings = initSettings;
+    m_initSettings = initSettings;
 }
 
 IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
@@ -797,12 +901,12 @@ IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
 
     co_await RemoveMrcEffectsAsync();
 
-	if (m_initSettings != nullptr)
-	{
-		m_initSettings.as<IAdvancedMediaCaptureInitializationSettings>()->SetDirectxDeviceManager(nullptr);
+    if (m_initSettings != nullptr)
+    {
+        m_initSettings.as<IAdvancedMediaCaptureInitializationSettings>()->SetDirectxDeviceManager(nullptr);
 
-		m_initSettings = nullptr;
-	}
+        m_initSettings = nullptr;
+    }
 
     m_mediaCapture.Close();
 
@@ -811,7 +915,7 @@ IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
 
 
 IAsyncAction CaptureEngine::AddMrcEffectsAsync(
-    boolean const enableAudio)
+    boolean enableAudio)
 {
     if (m_mediaCapture == nullptr)
     {
@@ -822,17 +926,21 @@ IAsyncAction CaptureEngine::AddMrcEffectsAsync(
 
     try
     {
-        auto mrcVideoEffect = make<MrcVideoEffect>().as<IVideoEffectDefinition>();
+        auto mrcVideoEffect = Media::Capture::MrcVideoEffect();
+
         if (captureSettings.VideoDeviceCharacteristic() == VideoDeviceCharacteristic::AllStreamsIdentical ||
             captureSettings.VideoDeviceCharacteristic() == VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
         {
-            // This effect will modify both the preview and the record streams
+            mrcVideoEffect.StreamType(MediaStreamType::VideoRecord);
             m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoRecord);
         }
         else
         {
-            m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoRecord);
+            mrcVideoEffect.StreamType(MediaStreamType::VideoPreview);
             m_mrcPreviewEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoPreview);
+
+            mrcVideoEffect.StreamType(MediaStreamType::VideoRecord);
+            m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoRecord);
         }
 
         if (enableAudio)
@@ -876,24 +984,9 @@ IAsyncAction CaptureEngine::RemoveMrcEffectsAsync()
 			co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
 			m_mrcVideoEffect = nullptr;
 		}
-	}
-	else
-	{
-		co_return;
-	}
-}
-
-
-void CaptureEngine::ResetPayloadHandler()
-{
-	if (m_payloadHandler != nullptr)
-	{
-		m_payloadHandler.OnMediaProfile(m_profileEventToken);
-		m_payloadHandler.OnStreamPayload(m_payloadEventToken);
-		m_payloadHandler.OnStreamSample(m_streamSampleEventToken);
-		m_payloadHandler.OnStreamMetadata(m_streamMetaDataEventToken);
-		m_payloadHandler.OnStreamDescription(m_streamDescriptionEventToken);
-
-		m_payloadHandler = nullptr;
-	}
+    }
+    else
+    {
+        co_return;
+    }
 }

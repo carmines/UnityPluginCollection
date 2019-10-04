@@ -9,20 +9,15 @@ namespace CameraCapture.Media
 {
     [marshaling_behavior(agile)]
     [threading(both)]
-	[version(1.0)]
-	runtimeclass PayloadHandler : Windows.Foundation.IClosable
+    [version(1.0)]
+    runtimeclass PayloadHandler : CameraCapture.Media.IPayloadHandler, Windows.Foundation.IClosable
     {
-		PayloadHandler();
+        PayloadHandler();
 
-		void QueueMediaProfile(Windows.Media.MediaProperties.MediaEncodingProfile mediaProfile);
-		void QueueStreamSample(Windows.Media.Core.MediaStreamSample sample);
-		void QueueStreamMetadata(Windows.Media.MediaProperties.MediaPropertySet metaData);
-		void QueueStreamMediaDescription(Windows.Media.MediaProperties.IMediaEncodingProperties mediaDescription);
-
-		event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaEncodingProfile> OnMediaProfile;
-		event Windows.Foundation.EventHandler<Payload> OnStreamPayload;
-		event Windows.Foundation.EventHandler<Windows.Media.Core.MediaStreamSample> OnStreamSample;
-		event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaPropertySet> OnStreamMetadata;
-		event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.IMediaEncodingProperties> OnStreamDescription;
-	};
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaEncodingProfile> OnMediaProfile;
+        event Windows.Foundation.EventHandler<Payload> OnStreamPayload;
+        event Windows.Foundation.EventHandler<Windows.Media.Core.MediaStreamSample> OnStreamSample;
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaPropertySet> OnStreamMetadata;
+        event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.IMediaEncodingProperties> OnStreamDescription;
+    };
 }

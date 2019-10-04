@@ -84,8 +84,10 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         void State(Capture::State const& value) { m_currentState = value; }
 
     private:
-        STDMETHODIMP CheckShutdown() const
+        STDMETHODIMP CheckShutdown()
         {
+            auto guard = m_cs.Guard();
+
             if (m_currentState == State::Shutdown)
             {
                 return MF_E_SHUTDOWN;
@@ -100,6 +102,8 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         void SetStartTimeOffset(
             _In_ LONGLONG firstSampleTime)
         {
+            auto guard = m_cs.Guard();
+
             if (firstSampleTime < m_clockStartOffset) // do not process samples predating the clock start offset;
             {
                 return;
@@ -111,36 +115,36 @@ namespace winrt::CameraCapture::Media::Capture::implementation
             }
         }
 
-		STDMETHODIMP ShouldDropSample(_In_ IMFSample* pSample, _Outptr_ bool *pDrop);
+        STDMETHODIMP ShouldDropSample(_In_ IMFSample* pSample, _Outptr_ bool *pDrop);
         STDMETHODIMP NotifyStarted();
         STDMETHODIMP NotifyStopped();
         STDMETHODIMP NotifyMarker(const PROPVARIANT *pVarContextValue);
         STDMETHODIMP NotifyRequestSample();
 
     private:
-		slim_mutex m_mutex;
-		slim_mutex m_eventMutex;
+        CriticalSection m_cs;
+        CriticalSection m_eventCS;
 
         std::atomic<Capture::State> m_currentState;
         LONGLONG m_clockStartOffset;    // Presentation time when the clock started.
         LONGLONG m_startTimeOffset;     // amount to subtract from a timestamp
         
-		uint8_t m_streamIndex;
-		Windows::Media::MediaProperties::IMediaEncodingProperties m_encodingProperties;
+        uint8_t m_streamIndex;
+        Windows::Media::MediaProperties::IMediaEncodingProperties m_encodingProperties;
         com_ptr<IMFMediaType> m_mediaType;
         GUID m_guidMajorType;
         GUID m_guidSubType;
 
-        Capture::Sink m_parentSink;
+        CameraCapture::Media::Capture::Sink m_parentSink;
         com_ptr<IMFMediaEventQueue> m_eventQueue;
 
-		bool m_setDiscontinuity;
-		bool m_enableSampleRequests;
-		uint8_t m_sampleRequests;
-		LONGLONG m_lastTimestamp;
-		LONGLONG m_lastDecodeTime;
+        bool m_setDiscontinuity;
+        bool m_enableSampleRequests;
+        uint8_t m_sampleRequests;
+        LONGLONG m_lastTimestamp;
+        LONGLONG m_lastDecodeTime;
 
-		static const uint8_t m_cMaxSampleRequests = MAX_SAMPLE_REQUESTS;
+        static const uint8_t m_cMaxSampleRequests = MAX_SAMPLE_REQUESTS;
     };
 }
 

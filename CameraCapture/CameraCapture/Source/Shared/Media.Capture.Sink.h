@@ -5,6 +5,7 @@
 
 #include "Media.Capture.Sink.g.h"
 #include "Media.Capture.StreamSink.h"
+#include "Media.PayloadHandler.g.h"
 
 #include <mfapi.h>
 #include <mfidl.h>
@@ -20,6 +21,12 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         Sink() = delete;
         Sink(Windows::Media::MediaProperties::MediaEncodingProfile const& encodingProfile);
         ~Sink() { Reset(); }
+
+        // IPayloadHandler
+        void QueueEncodingProfile(Windows::Media::MediaProperties::MediaEncodingProfile const& mediaProfile);
+        void QueueMetadata(Windows::Media::MediaProperties::MediaPropertySet const& metaData);
+        void QueueEncodingProperties(Windows::Media::MediaProperties::IMediaEncodingProperties const& mediaDescription);
+        void QueuePayload(CameraCapture::Media::Payload const& payload);
 
         // IMediaExtension
         void SetProperties(Windows::Foundation::Collections::IPropertySet const& configuration);
@@ -65,17 +72,14 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         HRESULT OnEndOfStream();
 
         Capture::State State() { return m_currentState; }
-		CameraCapture::Media::PayloadHandler PayloadHandler() { return m_payloadHandler; }
-		void PayloadHandler(CameraCapture::Media::PayloadHandler const& value) 
-		{ 
-			m_payloadHandler = value; 
-		
-			if (m_payloadHandler != nullptr)
-			{
-				m_payloadHandler.QueueMediaProfile(m_mediaEncodingProfile);
-			}
-		}
-		Windows::Media::MediaProperties::MediaEncodingProfile EncodingProfile() { return m_mediaEncodingProfile; }
+        Media::PayloadHandler PayloadHandler() { return m_payloadHandler; }
+        void PayloadHandler(Media::PayloadHandler const& value) 
+        { 
+            m_payloadHandler = value; 
+        
+            QueueEncodingProfile(m_mediaEncodingProfile);
+        }
+        Windows::Media::MediaProperties::MediaEncodingProfile EncodingProfile() { return m_mediaEncodingProfile; }
 
     private:
         void Reset();
@@ -100,14 +104,14 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         }
 
     private:
-		slim_mutex m_mutex;
-		std::atomic<Capture::State> m_currentState;
+        CriticalSection m_cs;
+        std::atomic<Capture::State> m_currentState;
 
-		Windows::Media::MediaProperties::MediaEncodingProfile m_mediaEncodingProfile;
-        std::list<com_ptr<IMFStreamSink>> m_streamSinks;
+        Windows::Media::MediaProperties::MediaEncodingProfile m_mediaEncodingProfile;
+        std::list<CameraCapture::Media::Capture::StreamSink> m_streamSinks;
         com_ptr<IMFPresentationClock> m_presentationClock;
 
-		CameraCapture::Media::PayloadHandler m_payloadHandler;
+        CameraCapture::Media::PayloadHandler m_payloadHandler;
     };
 }
 

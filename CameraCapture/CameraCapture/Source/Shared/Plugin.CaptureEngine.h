@@ -23,42 +23,43 @@ namespace winrt::CameraCapture::Plugin::implementation
             _In_ void* pCallbackObject);
 
         CaptureEngine();
-		~CaptureEngine();
+        ~CaptureEngine() { Shutdown(); }
 
-        virtual void Shutdown();
+        virtual void Shutdown() override;
 
         hresult StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc);
-		hresult StopPreview();
+        hresult StopPreview();
+        hresult TakePhoto(uint32_t width, uint32_t height, bool enableMrc);
 
-		CameraCapture::Media::Capture::Sink MediaSink();
+        CameraCapture::Media::Capture::Sink MediaSink();
 
-		CameraCapture::Media::PayloadHandler PayloadHandler();
-		void PayloadHandler(CameraCapture::Media::PayloadHandler const& value);
+        CameraCapture::Media::PayloadHandler PayloadHandler();
+        void PayloadHandler(CameraCapture::Media::PayloadHandler const& value);
 
-		Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
-		void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
+        Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
+        void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
 
 
     private:
-		void ResetPayloadHandler();
-
         hresult CreateDeviceResources();
         void ReleaseDeviceResources();
 
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
         Windows::Foundation::IAsyncAction StopPreviewCoroutine();
+        Windows::Foundation::IAsyncOperation<Media::Payload> TakePhotoCoroutine(uint32_t const width, uint32_t const height, boolean const enableMrc);
 
-        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(boolean const& enableAudio, uint32_t const& width, uint32_t const& height);
+        Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(uint32_t const& width, uint32_t const& height, boolean const& enableAudio);
         Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
 
         Windows::Foundation::IAsyncAction AddMrcEffectsAsync(boolean const enableAudio);
         Windows::Foundation::IAsyncAction RemoveMrcEffectsAsync();
 
     private:
-		CRITICAL_SECTION m_cs;
-		std::atomic<boolean> m_isShutdown;
-		winrt::handle m_startPreviewEventHandle;
-		winrt::handle m_stopPreviewEventHandle;
+        CriticalSection m_cs;
+        std::atomic<boolean> m_isShutdown;
+        winrt::handle m_startPreviewEventHandle;
+        winrt::handle m_stopPreviewEventHandle;
+        winrt::handle m_takePhotoEventHandle;
 
         com_ptr<ID3D11Device> m_mediaDevice;
         uint32_t m_resetToken;
@@ -66,14 +67,15 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction m_startPreviewOp;
         Windows::Foundation::IAsyncAction m_stopPreviewOp;
+        Windows::Foundation::IAsyncOperation<Media::Payload> m_takePhotoOp;
 
         // media capture
-		Windows::Media::Capture::MediaCategory m_category;
-		Windows::Media::Capture::MediaStreamType m_streamType;
-		Windows::Media::Capture::KnownVideoProfile m_videoProfile;
-		Windows::Media::Capture::MediaCaptureSharingMode m_sharingMode;
+        Windows::Media::Capture::MediaCategory m_category;
+        Windows::Media::Capture::MediaStreamType m_streamType;
+        Windows::Media::Capture::KnownVideoProfile m_videoProfile;
+        Windows::Media::Capture::MediaCaptureSharingMode m_sharingMode;
         Windows::Media::Capture::MediaCapture m_mediaCapture;
-		Windows::Media::Capture::MediaCaptureInitializationSettings m_initSettings;
+        Windows::Media::Capture::MediaCaptureInitializationSettings m_initSettings;
 
         Windows::Media::IMediaExtension m_mrcAudioEffect;
         Windows::Media::IMediaExtension m_mrcVideoEffect;
@@ -83,15 +85,12 @@ namespace winrt::CameraCapture::Plugin::implementation
         Media::Capture::Sink m_mediaSink;
 
         Media::PayloadHandler m_payloadHandler;
-        event_token m_profileEventToken;
-        event_token m_payloadEventToken;
-		event_token m_streamSampleEventToken;
-        event_token m_streamMetaDataEventToken;
-		event_token m_streamDescriptionEventToken;
+        Media::PayloadHandler::OnStreamPayload_revoker m_payloadEventRevoker;
 
         // buffers
         com_ptr<IMFSample> m_audioSample;
         com_ptr<SharedTexture> m_sharedVideoTexture;
+        com_ptr<SharedTexture> m_sharedPhotoTexture;
 
         Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };

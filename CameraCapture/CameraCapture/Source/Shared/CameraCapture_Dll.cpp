@@ -18,7 +18,7 @@ namespace impl
 namespace winrt
 {
     using namespace winrt::CameraCapture::Plugin;
-	using namespace winrt::CameraCapture::Media::Capture;
+    using namespace winrt::CameraCapture::Media::Capture;
 }
 
 static INSTANCE_HANDLE s_lastPluginHandleIndex = INSTANCE_HANDLE_INVALID;
@@ -68,7 +68,7 @@ HRESULT TrackModule(winrt::Module &module, INSTANCE_HANDLE * handleId)
 // UnitySetInterfaces
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
 
-extern "C" void	UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
+extern "C" void    UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
 {
     s_lastPluginHandleIndex = INSTANCE_HANDLE_START;
     s_instances.clear();
@@ -191,17 +191,17 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStartPrevie
     _In_ boolean enableMrc)
 {
     winrt::Module module = nullptr;
-	winrt::hresult hr = GetModule(id, module);
+    winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
         hr = capture.StartPreview(width, height, enableAudio, enableMrc);
-		if (SUCCEEDED(hr))
-		{
-			capture.PayloadHandler(winrt::CameraCapture::Media::PayloadHandler());
-		}
+        if (SUCCEEDED(hr))
+        {
+            capture.PayloadHandler(winrt::CameraCapture::Media::PayloadHandler());
+        }
     }
 
     return hr;
@@ -211,13 +211,32 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStopPreview
     _In_ INSTANCE_HANDLE id)
 {
     winrt::Module module = nullptr;
-	winrt::hresult hr = GetModule(id, module);
+    winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
-		hr = capture.StopPreview();
+        hr = capture.StopPreview();
+    }
+
+    return hr;
+}
+
+extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureTakePhoto(
+    _In_ INSTANCE_HANDLE id,
+    _In_ uint32_t width,
+    _In_ uint32_t height,
+    _In_ boolean enableMrc)
+{
+    winrt::Module module = nullptr;
+    winrt::hresult hr = GetModule(id, module);
+    if (SUCCEEDED(hr))
+    {
+        auto capture = module.as<winrt::CaptureEngine>();
+        NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
+
+        hr = capture.TakePhoto(width, height, enableMrc);
     }
 
     return hr;
@@ -228,7 +247,7 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureSetCoordina
     _In_ IUnknown* appCoodinateSystem)
 {
     winrt::Module module = nullptr;
-	winrt::hresult hr = GetModule(id, module);
+    winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
         auto capture = module.as<winrt::CaptureEngine>();

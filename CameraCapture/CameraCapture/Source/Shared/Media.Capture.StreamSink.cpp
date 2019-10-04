@@ -19,16 +19,16 @@ using namespace Windows::Media::MediaProperties;
 StreamSink::StreamSink(
     uint8_t index,
     IMediaEncodingProperties const& encodingProperties,
-	CameraCapture::Media::Capture::Sink const& parent)
+    CameraCapture::Media::Capture::Sink const& parent)
     : m_currentState(State::Ready)
     , m_streamIndex(index)
     , m_parentSink(parent)
     , m_encodingProperties(encodingProperties)
-	, m_setDiscontinuity(false)
-	, m_enableSampleRequests(true)
-	, m_sampleRequests(0)
-	, m_lastTimestamp(-1)
-	, m_lastDecodeTime(-1)
+    , m_setDiscontinuity(false)
+    , m_enableSampleRequests(true)
+    , m_sampleRequests(0)
+    , m_lastTimestamp(-1)
+    , m_lastDecodeTime(-1)
 {
     IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(m_encodingProperties), m_mediaType.put()));
     IFT(m_mediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
@@ -39,20 +39,20 @@ StreamSink::StreamSink(
 StreamSink::StreamSink(
     uint8_t index,
     IMFMediaType* pMediaType,
-	CameraCapture::Media::Capture::Sink const& parent)
+    CameraCapture::Media::Capture::Sink const& parent)
     : m_streamIndex(index)
     , m_parentSink(parent)
-	, m_setDiscontinuity(false)
-	, m_enableSampleRequests(true)
-	, m_sampleRequests(0)
-	, m_lastTimestamp(-1)
-	, m_lastDecodeTime(-1)
+    , m_setDiscontinuity(false)
+    , m_enableSampleRequests(true)
+    , m_sampleRequests(0)
+    , m_lastTimestamp(-1)
+    , m_lastDecodeTime(-1)
 {
-	m_mediaType.copy_from(pMediaType);
-	IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
+    m_mediaType.copy_from(pMediaType);
+    IFT(pMediaType->GetGUID(MF_MT_MAJOR_TYPE, &m_guidMajorType));
     IFT(pMediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
-	IFT(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
-	IFT(MFCreateEventQueue(m_eventQueue.put()));
+    IFT(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
+    IFT(MFCreateEventQueue(m_eventQueue.put()));
 }
 
 // IMediaExtension
@@ -68,7 +68,7 @@ HRESULT StreamSink::GetMediaSink(
 {
     Log(L"StreamSink::GetMediaSink().\n");
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     m_parentSink.as<IMFMediaSink>().copy_to(ppMediaSink);
 
@@ -79,7 +79,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetIdentifier(
     DWORD *pdwIdentifier)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     *pdwIdentifier = m_streamIndex;
 
@@ -92,7 +92,7 @@ HRESULT StreamSink::GetMediaTypeHandler(
 {
     Log(L"StreamSink::GetMediaTypeHandler().\n");
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     NULL_CHK_HR(m_parentSink, MF_E_NOT_INITIALIZED);
 
@@ -107,51 +107,19 @@ HRESULT StreamSink::Flush()
 {
     Log(L"StreamSink::Flush().\n");
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
-	m_enableSampleRequests = TRUE;
-	m_sampleRequests = 0;
-	m_lastTimestamp = -1;
-	m_lastDecodeTime = -1;
+    IFR(CheckShutdown());
 
-	auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
-	propSet.Insert(MF_PAYLOAD_FLUSH, box_value<uint32_t>(1));
+    m_enableSampleRequests = TRUE;
+    m_sampleRequests = 0;
+    m_lastTimestamp = -1;
+    m_lastDecodeTime = -1;
 
-	auto handler = m_parentSink.PayloadHandler();
-	if (handler != nullptr)
-	{
-		handler.QueueStreamMetadata(propSet);
-	}
+    auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
+    propSet.Insert(MF_PAYLOAD_FLUSH, box_value<uint32_t>(1));
 
-    //auto payloadProcessor = m_parentMediaSink.as<MixedRemoteViewCompositor::Media::NetworkMediaSink>().PayloadProcessor();
-    //if (payloadProcessor != nullptr)
-    //{
-    //    const uint32_t c_cPayloadHeader = sizeof(MixedRemoteViewCompositor::Network::PayloadHeader);
-    //    const uint32_t c_cFlushhHeader = sizeof(MixedRemoteViewCompositor::Network::FlushHeader);
-    //    const uint32_t c_cTotalBundleSize = c_cPayloadHeader + c_cFlushhHeader;
-
-    //    // create databuffer large enough for payload type and media buffer header
-    //    auto headerData = MixedRemoteViewCompositor::Network::DataBuffer(c_cTotalBundleSize);
-
-    //    uint8_t* rawBuffer = nullptr;
-    //    IFR(headerData.as<IBufferByteAccess>()->Buffer(&rawBuffer));
-
-    //    auto payloadHeader = reinterpret_cast<MixedRemoteViewCompositor::Network::PayloadHeader*>(rawBuffer);
-    //    payloadHeader->Type = MixedRemoteViewCompositor::Network::DataBundleType::Flush;
-    //    payloadHeader->Size = c_cFlushhHeader;
-
-    //    auto flushHeader = reinterpret_cast<MixedRemoteViewCompositor::Network::FlushHeader*>(rawBuffer + c_cPayloadHeader);
-    //    flushHeader->StreamIndex = static_cast<uint32_t>(m_streamId);
-
-    //    headerData.Length(c_cPayloadHeader + payloadHeader->Size);
-
-    //    auto dataBundle = MixedRemoteViewCompositor::Network::DataBundle(payloadHeader->Type);
-    //    dataBundle.AddBuffer(headerData);
-
-    //    auto payload = MixedRemoteViewCompositor::Media::Payload(static_cast<uint32_t>(m_streamId), MixedRemoteViewCompositor::Media::PayloadType::Flush, dataBundle);
-
-    //    IFR(payloadProcessor.QueuePayload(payload));
-    //}
+    m_parentSink.QueueMetadata(propSet);
 
     return S_OK;
 }
@@ -160,11 +128,11 @@ _Use_decl_annotations_
 HRESULT StreamSink::ProcessSample(
     IMFSample *pSample)
 {
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
 
-	bool shouldDrop = false;
+    bool shouldDrop = false;
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFG(CheckShutdown(), done);
 
@@ -173,30 +141,33 @@ HRESULT StreamSink::ProcessSample(
         IFG(MF_E_INVALIDREQUEST, done);
     }
 
-	hr = ShouldDropSample(pSample, &shouldDrop);
+    hr = ShouldDropSample(pSample, &shouldDrop);
 
-	if (!shouldDrop)
-	{
-		if (m_setDiscontinuity)
-		{
-			IFG(pSample->SetUINT32(MFSampleExtension_Discontinuity, TRUE), done);
+    if (!shouldDrop)
+    {
+        if (m_setDiscontinuity)
+        {
+            IFG(pSample->SetUINT32(MFSampleExtension_Discontinuity, TRUE), done);
 
-			m_setDiscontinuity = false;
-		}
+            m_setDiscontinuity = false;
+        }
 
-		auto handler = m_parentSink.PayloadHandler().as<Media::implementation::PayloadHandler>();
-		if (handler != nullptr)
-		{
-			com_ptr<IMFSample> spSample = nullptr;
-			spSample.copy_from(pSample); //add ref
+        com_ptr<IMFSample> spSample = nullptr;
+        spSample.copy_from(pSample); //add ref
 
-			handler->QueueMFSample(m_guidMajorType, m_mediaType, spSample);
-		}
-	}
+        auto payload = CameraCapture::Media::Payload();
+        auto streamSample = payload.try_as<IStreamSample>();
+        if (streamSample != nullptr)
+        {
+            streamSample->Sample(m_guidMajorType, m_mediaType, spSample);
+        }
+
+        m_parentSink.QueuePayload(payload);
+    }
 
 done:
     if (State() == State::Started && SUCCEEDED(hr))
-	{
+    {
         IFR(NotifyRequestSample());
     }
 
@@ -209,7 +180,7 @@ HRESULT StreamSink::PlaceMarker(
     const PROPVARIANT * pvarMarkerValue,
     const PROPVARIANT * pvarContextValue)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -222,15 +193,12 @@ HRESULT StreamSink::PlaceMarker(
     {
         State(State::Eos);
 
-        if (m_parentSink != nullptr)
-        {
-            IFR(m_parentSink.OnEndOfStream());
-        }
-	}
+        IFR(m_parentSink.OnEndOfStream());
+    }
 
-	auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
+    auto propSet = Windows::Media::MediaProperties::MediaPropertySet();
 
-	propSet.Insert(MF_PAYLOAD_MARKER_TYPE, box_value<uint32_t>(eMarkerType));
+    propSet.Insert(MF_PAYLOAD_MARKER_TYPE, box_value<uint32_t>(eMarkerType));
 
     if (eMarkerType == MFSTREAMSINK_MARKER_TICK)
     {
@@ -254,22 +222,16 @@ HRESULT StreamSink::PlaceMarker(
                 timeStamp.QuadPart = correctedSampleTime;
             }
 
-			propSet.Insert(MF_PAYLOAD_MARKER_TICK, ConvertProperty(*pvarContextValue));
-			propSet.Insert(MF_PAYLOAD_MARKER_TICK_TIMESTAMP, ConvertProperty(*pvarMarkerValue));
+            propSet.Insert(MF_PAYLOAD_MARKER_TICK, ConvertProperty(*pvarContextValue));
+            propSet.Insert(MF_PAYLOAD_MARKER_TICK_TIMESTAMP, ConvertProperty(*pvarMarkerValue));
         }
     }
 
-	HRESULT hr = S_OK;
-
-	auto handler = m_parentSink.PayloadHandler();
-	if (handler != nullptr)
-	{
-		handler.QueueStreamMetadata(propSet);
-	}
+    m_parentSink.QueueMetadata(propSet);
 
     IFR(NotifyMarker(pvarContextValue));
 
-    return hr;
+    return S_OK;
 }
 
 // IMFMediaEventGenerator
@@ -278,7 +240,7 @@ HRESULT StreamSink::BeginGetEvent(
     IMFAsyncCallback *pCallback,
     ::IUnknown *punkState)
 {
-	std::shared_lock<slim_mutex> slk(m_eventMutex);
+    auto guard = m_cs.Guard();
 
     return m_eventQueue->BeginGetEvent(pCallback, punkState);
 }
@@ -288,7 +250,7 @@ HRESULT StreamSink::EndGetEvent(
     IMFAsyncResult *pResult,
     IMFMediaEvent **ppEvent)
 {
-	std::shared_lock<slim_mutex> slk(m_eventMutex);
+    auto guard = m_cs.Guard();
 
     return m_eventQueue->EndGetEvent(pResult, ppEvent);
 }
@@ -298,7 +260,7 @@ HRESULT StreamSink::GetEvent(
     DWORD dwFlags,
     IMFMediaEvent **ppEvent)
 {
-	std::shared_lock<slim_mutex> slk(m_eventMutex);
+    auto guard = m_cs.Guard();
 
     return m_eventQueue->GetEvent(dwFlags, ppEvent);
 }
@@ -310,7 +272,7 @@ HRESULT StreamSink::QueueEvent(
     HRESULT hrStatus,
     const PROPVARIANT *pvValue)
 {
-	std::shared_lock<slim_mutex> slk(m_eventMutex);
+    auto guard = m_cs.Guard();
 
     return m_eventQueue->QueueEventParamVar(met, guidExtendedType, hrStatus, pvValue);
 }
@@ -321,7 +283,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetCurrentMediaType(
     IMFMediaType **ppMediaType)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     m_mediaType.copy_to(ppMediaType);
 
@@ -332,7 +294,7 @@ _Use_decl_annotations_
 HRESULT StreamSink::GetMajorType(
     GUID *pguidMajorType)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     *pguidMajorType = m_guidMajorType;
 
@@ -344,7 +306,7 @@ HRESULT StreamSink::GetMediaTypeByIndex(
     DWORD dwIndex,
     IMFMediaType **ppType)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     // support only one mediatype
     if (dwIndex > 0)
@@ -387,7 +349,7 @@ HRESULT StreamSink::SetCurrentMediaType(
 {
     NULL_CHK_HR(pMediaType, E_INVALIDARG);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     if (m_mediaType != nullptr)
     {
@@ -401,13 +363,9 @@ HRESULT StreamSink::SetCurrentMediaType(
     IFR(mediaType->GetGUID(MF_MT_SUBTYPE, &m_guidSubType));
 
     m_mediaType = mediaType;
-	IFR(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
+    IFR(MFCreatePropertiesFromMediaType(m_mediaType.get(), guid_of<IMediaEncodingProperties>(), put_abi(m_encodingProperties)));
 
-	auto handler = m_parentSink.PayloadHandler();
-	if (handler != nullptr)
-    {
-		handler.QueueStreamMediaDescription(m_encodingProperties);
-    }
+    m_parentSink.QueueEncodingProperties(m_encodingProperties);
 
     return S_OK;
 }
@@ -418,7 +376,7 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
 {
     UNREFERENCED_PARAMETER(systemTime);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -426,11 +384,7 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
 
     State(State::Started);
 
-	auto handler = m_parentSink.PayloadHandler();
-	if (handler != nullptr)
-	{
-		handler.QueueStreamMediaDescription(m_encodingProperties);
-	}
+    m_parentSink.QueueEncodingProperties(m_encodingProperties);
 
     IFR(NotifyStarted());
 
@@ -442,7 +396,7 @@ HRESULT StreamSink::Start(int64_t systemTime, int64_t clockStartOffset)
 _Use_decl_annotations_
 HRESULT StreamSink::Stop()
 {
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -456,7 +410,7 @@ HRESULT StreamSink::Stop()
 _Use_decl_annotations_
 HRESULT StreamSink::Shutdown()
 {
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     if (m_currentState == State::Shutdown)
     {
@@ -529,100 +483,100 @@ HRESULT StreamSink::NotifyMarker(const PROPVARIANT *pVarContextValue)
 _Use_decl_annotations_
 HRESULT StreamSink::NotifyRequestSample()
 {
-	for (DWORD i = m_sampleRequests; i < m_cMaxSampleRequests; i++)
-	{
-		m_sampleRequests++;
+    for (DWORD i = m_sampleRequests; i < m_cMaxSampleRequests; i++)
+    {
+        m_sampleRequests++;
 
-		IFR(QueueEvent(MEStreamSinkRequestSample, GUID_NULL, S_OK, NULL));
-	}
+        IFR(QueueEvent(MEStreamSinkRequestSample, GUID_NULL, S_OK, NULL));
+    }
 
     return S_OK;
 }
 
 _Use_decl_annotations_
 HRESULT StreamSink::ShouldDropSample(
-	IMFSample* pSample,
-	bool *pDrop)
+    IMFSample* pSample,
+    bool *pDrop)
 {
-	NULL_CHK_HR(pSample, E_POINTER);
-	NULL_CHK_HR(pDrop, E_POINTER);
+    NULL_CHK_HR(pSample, E_POINTER);
+    NULL_CHK_HR(pDrop, E_POINTER);
 
-	*pDrop = false;
+    *pDrop = false;
 
-	HRESULT hr = S_OK;
+    HRESULT hr = S_OK;
 
-	LONGLONG timestamp = 0;
-	BOOL hasDecodeTime = false;
-	LONGLONG decodeTime = 0;
-	DWORD totalLength = 0;
+    LONGLONG timestamp = 0;
+    BOOL hasDecodeTime = false;
+    LONGLONG decodeTime = 0;
+    DWORD totalLength = 0;
 
-	// did we get a sample, even without requesting one
-	if (m_sampleRequests == 0 || State() == State::Eos)
-	{
-		*pDrop = true;
+    // did we get a sample, even without requesting one
+    if (m_sampleRequests == 0 || State() == State::Eos)
+    {
+        *pDrop = true;
 
-		IFG(MF_E_NOTACCEPTING, done);
-	}
+        IFG(MF_E_NOTACCEPTING, done);
+    }
 
-	m_sampleRequests--;
+    m_sampleRequests--;
 
-	IFG(pSample->GetSampleTime(&timestamp), done);
+    IFG(pSample->GetSampleTime(&timestamp), done);
 
-	// if this is the first sample, calculate the offset from start timestamp
-	if (m_startTimeOffset == PRESENTATION_CURRENT_POSITION)
-	{
-		SetStartTimeOffset(timestamp);
+    // if this is the first sample, calculate the offset from start timestamp
+    if (m_startTimeOffset == PRESENTATION_CURRENT_POSITION)
+    {
+        SetStartTimeOffset(timestamp);
 
-		if (m_startTimeOffset > 0)
-		{
-			Log(L"first sample is not at 0, ts=%I64d (m_startTimeOffset) timestamp=%I64d\n", m_startTimeOffset, timestamp);
-		}
-	}
+        if (m_startTimeOffset > 0)
+        {
+            Log(L"first sample is not at 0, ts=%I64d (m_startTimeOffset) timestamp=%I64d\n", m_startTimeOffset, timestamp);
+        }
+    }
 
-	if (FAILED(pSample->GetUINT64(MFSampleExtension_DecodeTimestamp, (QWORD*)&decodeTime)))
-	{
-		// No MFSampleExtension_DecodeTimestamp means DTS eaqual to PTS, using timestamp
-		if (timestamp <= m_lastDecodeTime)
-		{
-			Log(L"received sample with past timestamp, ts=%I64d (timestamp) m_lastDecodeTime=%I64d; dropping\n", timestamp, m_lastDecodeTime);
-			*pDrop = true;
-		}
-	}
-	else
-	{
-		hasDecodeTime = true;
-		Log(L"DTS exists, DTS=%I64d PTS=%I64d", decodeTime, timestamp);
-		if (decodeTime <= m_lastDecodeTime)
-		{
-			Log(L"received sample with past timestamp, ts=%I64d (decodeTime) m_lastDecodeTime=%I64d; dropping\n", decodeTime, m_lastDecodeTime);
-			*pDrop = true;
-		}
-	}
+    if (FAILED(pSample->GetUINT64(MFSampleExtension_DecodeTimestamp, (QWORD*)&decodeTime)))
+    {
+        // No MFSampleExtension_DecodeTimestamp means DTS eaqual to PTS, using timestamp
+        if (timestamp <= m_lastDecodeTime)
+        {
+            Log(L"received sample with past timestamp, ts=%I64d (timestamp) m_lastDecodeTime=%I64d; dropping\n", timestamp, m_lastDecodeTime);
+            *pDrop = true;
+        }
+    }
+    else
+    {
+        hasDecodeTime = true;
+        Log(L"DTS exists, DTS=%I64d PTS=%I64d\n", decodeTime, timestamp);
+        if (decodeTime <= m_lastDecodeTime)
+        {
+            Log(L"received sample with past timestamp, ts=%I64d (decodeTime) m_lastDecodeTime=%I64d; dropping\n", decodeTime, m_lastDecodeTime);
+            *pDrop = true;
+        }
+    }
 
-	IFG(pSample->GetTotalLength(&totalLength), done);
-	if (0 == totalLength)
-	{
-		Log(L"received 0 length sample; dropping\n");
-		*pDrop = true;
-	}
+    IFG(pSample->GetTotalLength(&totalLength), done);
+    if (0 == totalLength)
+    {
+        Log(L"received 0 length sample; dropping\n");
+        *pDrop = true;
+    }
 
-	if (*pDrop)
-	{
-		m_setDiscontinuity = true;
-	}
-	else
-	{
-		m_lastTimestamp = timestamp;
-		if (hasDecodeTime)
-		{
-			m_lastDecodeTime = decodeTime;
-		}
-		else
-		{
-			m_lastDecodeTime = timestamp;
-		}
-	}
+    if (*pDrop)
+    {
+        m_setDiscontinuity = true;
+    }
+    else
+    {
+        m_lastTimestamp = timestamp;
+        if (hasDecodeTime)
+        {
+            m_lastDecodeTime = decodeTime;
+        }
+        else
+        {
+            m_lastDecodeTime = timestamp;
+        }
+    }
 
 done:
-	return hr;
+    return hr;
 }

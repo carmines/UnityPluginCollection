@@ -12,17 +12,17 @@ using namespace Windows::Foundation;
 _Use_decl_annotations_
 void Module::Shutdown()
 {
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto gurad = m_cs.Guard();
 
     m_deviceResources.reset();
-	m_d3d11DeviceResources.reset();
+    m_d3d11DeviceResources.reset();
 }
 
 _Use_decl_annotations_
 void Module::OnRenderEvent(
     uint16_t frameNumber)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto gurad = m_cs.Guard();
 
     UNREFERENCED_PARAMETER(frameNumber);
 }
@@ -33,7 +33,7 @@ hresult Module::Initialize(
     StateChangedCallback stateCallback, 
     void* pCallbackObject)
 {
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto gurad = m_cs.Guard();
 
     NULL_CHK_HR(stateCallback, E_INVALIDARG);
 
@@ -43,7 +43,7 @@ hresult Module::Initialize(
         m_pClientObject = pCallbackObject;
         m_stateCallbacks = stateCallback;
         m_deviceResources = unityDevice;
-		m_d3d11DeviceResources = std::dynamic_pointer_cast<ID3D11DeviceResource>(resources);
+        m_d3d11DeviceResources = std::dynamic_pointer_cast<ID3D11DeviceResource>(resources);
     }
 
     return S_OK;
@@ -53,7 +53,7 @@ _Use_decl_annotations_
 hresult Module::Callback(
     CALLBACK_STATE state)
 {
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto gurad = m_cs.Guard();
 
     NULL_CHK_HR(m_stateCallbacks, S_OK);
 
@@ -84,7 +84,7 @@ hresult Module::Failed()
         state.value.failedState.hresult = e.to_abi();
     }
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto gurad = m_cs.Guard();
 
     NULL_CHK_HR(m_stateCallbacks, E_NOT_VALID_STATE);
     NULL_CHK_HR(m_pClientObject, E_NOT_VALID_STATE);

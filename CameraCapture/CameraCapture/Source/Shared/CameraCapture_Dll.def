@@ -10,4 +10,5 @@ EXPORTS
     CreateCapture
     CaptureStartPreview
     CaptureStopPreview
+    CaptureTakePhoto
     CaptureSetCoordinateSystem

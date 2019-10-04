@@ -5,12 +5,27 @@
 
 namespace CameraCapture.Media
 {
-	[marshaling_behavior(agile)]
-	[version(1.0)]
-	runtimeclass Payload
-	{
-		Windows.Media.MediaProperties.MediaPropertySet MediaPropertySet{ get; };
-		Windows.Media.MediaProperties.IMediaEncodingProperties EncodingProperties{ get; };
-		Windows.Media.Core.MediaStreamSample MediaStreamSample{ get; };
-	}
+    [version(1.0), uuid(43401b9d-bb76-4348-b1b5-46255998278f)]
+    interface IPayloadHandler : IInspectable
+    {
+        HRESULT QueueEncodingProfile(
+            [in] Windows.Media.MediaProperties.MediaEncodingProfile* mediaProfile);
+        HRESULT QueueMetadata(
+            [in] Windows.Media.MediaProperties.MediaPropertySet* metaData);
+        HRESULT QueueEncodingProperties(
+            [in] Windows.Media.MediaProperties.IMediaEncodingProperties* mediaDescription);
+        HRESULT QueuePayload(
+            [in] CameraCapture.Media.Payload* payload);
+    };
+
+    [marshaling_behavior(agile)]
+    [version(1.0)]
+    runtimeclass Payload
+    {
+        Payload();
+        
+        Windows.Media.MediaProperties.MediaPropertySet MediaPropertySet{ get; };
+        Windows.Media.MediaProperties.IMediaEncodingProperties EncodingProperties{ get; };
+        Windows.Media.Core.MediaStreamSample MediaStreamSample{ get; };
+    }
 }

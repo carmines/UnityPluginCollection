@@ -22,65 +22,83 @@
 
 struct __declspec(uuid("905a0fef-bc53-11df-8c49-001e4fc686da")) IBufferByteAccess : ::IUnknown
 {
-	virtual HRESULT __stdcall Buffer(uint8_t** value) = 0;
+    virtual HRESULT __stdcall Buffer(uint8_t** value) = 0;
 };
 
 struct CustomBuffer : winrt::implements<CustomBuffer, winrt::Windows::Storage::Streams::IBuffer, ::IBufferByteAccess>
 {
-	std::vector<uint8_t> m_buffer;
-	uint32_t m_length{};
+    std::vector<uint8_t> m_buffer;
+    uint32_t m_length{};
 
-	CustomBuffer(uint32_t size) :
-		m_buffer(size)
-	{
-	}
+    CustomBuffer(uint32_t size) :
+        m_buffer(size)
+    {
+    }
 
-	uint32_t Capacity() const
-	{
-		return m_buffer.size();
-	}
+    uint32_t Capacity() const
+    {
+        return m_buffer.size();
+    }
 
-	uint32_t Length() const
-	{
-		return m_length;
-	}
+    uint32_t Length() const
+    {
+        return m_length;
+    }
 
-	void Length(uint32_t value)
-	{
-		if (value > m_buffer.size())
-		{
-			throw winrt::hresult_invalid_argument();
-		}
+    void Length(uint32_t value)
+    {
+        if (value > m_buffer.size())
+        {
+            throw winrt::hresult_invalid_argument();
+        }
 
-		m_length = value;
-	}
+        m_length = value;
+    }
 
-	HRESULT __stdcall Buffer(uint8_t** value) final
-	{
-		*value = m_buffer.data();
-		return S_OK;
-	}
+    HRESULT __stdcall Buffer(uint8_t** value) final
+    {
+        *value = m_buffer.data();
+        return S_OK;
+    }
 };
 
-class CriticalSectionGuard
-{
-public:
-	CriticalSectionGuard(CRITICAL_SECTION& criticalSection) 
-		: m_criticalSection(criticalSection)
-	{
-		::EnterCriticalSection(&m_criticalSection);
-	}
 
-	~CriticalSectionGuard()
-	{
-		::LeaveCriticalSection(&m_criticalSection);
-	}
+struct CriticalSection
+{
+    struct CriticalSectionGuard
+    {
+        CriticalSectionGuard(CRITICAL_SECTION& criticalSection) 
+            : m_criticalSection(criticalSection)
+        {
+            ::EnterCriticalSection(&m_criticalSection);
+        }
+
+        ~CriticalSectionGuard()
+        {
+            ::LeaveCriticalSection(&m_criticalSection);
+        }
+
+    private:
+        CriticalSectionGuard(const CriticalSectionGuard&) = delete;
+        CriticalSectionGuard& operator=(const CriticalSectionGuard&) = delete;
+
+        CRITICAL_SECTION& m_criticalSection;
+    };
+
+    CriticalSection()
+    {
+        InitializeCriticalSection(&m_cs);
+    }
+
+    ~CriticalSection()
+    {
+        DeleteCriticalSection(&m_cs);
+    }
+
+    CriticalSectionGuard const Guard() { return CriticalSectionGuard(m_cs); }
 
 private:
-	CriticalSectionGuard(const CriticalSectionGuard&) = delete;
-	CriticalSectionGuard& operator=(const CriticalSectionGuard&) = delete;
-
-	CRITICAL_SECTION& m_criticalSection;
+    CRITICAL_SECTION m_cs;
 };
 
 inline void __stdcall Log(
@@ -100,23 +118,23 @@ inline void __stdcall Log(
 }
 
 #ifndef IFR
-#define IFR(hresult) { HRESULT hrTest = hresult; if (FAILED(hrTest)) { return hrTest; } } 
+#define IFR(HR) { HRESULT hrTest = HR; if (FAILED(hrTest)) { return hrTest; } } 
 #endif
 
 #ifndef NULL_CHK_HR
-#define NULL_CHK_HR(pointer, hresult) if (nullptr == pointer) { IFR(hresult); }
+#define NULL_CHK_HR(pointer, HR) if (nullptr == pointer) { IFR(HR); }
 #endif
 
 #ifndef IFV
-#define IFV(hresult) { HRESULT hrTest = hresult; if (FAILED(hrTest)) { return; } }
+#define IFV(HR) { HRESULT hrTest = HR; if (FAILED(hrTest)) { return; } }
 #endif
 
 #ifndef IFT
-#define IFT(hresult) { HRESULT hrTest = hresult; if (FAILED(hrTest)) { winrt::throw_hresult(hrTest); } }
+#define IFT(HR) { HRESULT hrTest = HR; if (FAILED(hrTest)) { winrt::throw_hresult(hrTest); } }
 #endif
 
 #ifndef IFG
-#define IFG(hresult, marker) { HRESULT hrTest = hresult; if (FAILED(hrTest)) { hr = hrTest; goto marker; } }
+#define IFG(HR, marker) { HRESULT hrTest = HR; if (FAILED(hrTest)) { hr = hrTest; goto marker; } }
 #endif
 
 #ifndef NULL_CHK_R
@@ -148,7 +166,8 @@ typedef enum class _CaptureStateType : int32_t
     PreviewStarted,
     PreviewStopped,
     PreviewAudioFrame,
-    PreviewVideoFrame
+    PreviewVideoFrame,
+    PhotoFrame
 } CaptureStateType;
 
 typedef struct _CAPTURE_STATE

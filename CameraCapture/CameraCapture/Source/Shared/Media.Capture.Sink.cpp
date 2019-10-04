@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "Media.Capture.Sink.h"
 #include "Media.Capture.Sink.g.cpp"
+#include "Media.PayloadHandler.g.h"
 
 using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
@@ -13,32 +14,28 @@ using winrtStreamSink = CameraCapture::Media::Capture::StreamSink;
 
 Sink::Sink(MediaEncodingProfile const& encodingProfile)
     : m_currentState(State::Ready)
-	, m_mediaEncodingProfile(encodingProfile)
+    , m_mediaEncodingProfile(encodingProfile)
     , m_streamSinks()
     , m_payloadHandler(nullptr)
 {
 
     if (encodingProfile.Audio() != nullptr)
     {
-        auto sinkStream = make<StreamSink>(AudioStreamId, encodingProfile.Audio().as<IMediaEncodingProperties>(), *this);
-        m_streamSinks.emplace_front(sinkStream.as<IMFStreamSink>());
+        auto sinkStream = CameraCapture::Media::Capture::StreamSink(AudioStreamId, encodingProfile.Audio(), *this);
+        m_streamSinks.emplace_front(sinkStream);
     }
 
     if (encodingProfile.Video() != nullptr)
     {
-        com_ptr<IMFMediaType> mediaType = nullptr;
-        IFT(MFCreateMediaTypeFromProperties(winrt::get_unknown(encodingProfile.Video()), mediaType.put()));
-
         uint8_t streamId = VideoStreamId;
         if (encodingProfile.Audio() == nullptr)
         {
             streamId = 0;
         }
 
-        auto sinkStream = make<StreamSink>(streamId, encodingProfile.Video().as<IMediaEncodingProperties>(), *this);
-        m_streamSinks.emplace_back(sinkStream.as<IMFStreamSink>());
+        auto sinkStream = CameraCapture::Media::Capture::StreamSink(streamId, encodingProfile.Video(), *this);
+        m_streamSinks.emplace_back(sinkStream);
     }
-
 }
 
 // IMediaExtension
@@ -54,7 +51,7 @@ HRESULT Sink::GetCharacteristics(
 {
     Log(L"Sink::GetCharacteristics()\n");
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -76,7 +73,7 @@ HRESULT Sink::AddStreamSink(
 
     *ppStreamSink = nullptr;
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -90,7 +87,7 @@ HRESULT Sink::AddStreamSink(
     auto itEnd = m_streamSinks.end();
     for (; it != itEnd; ++it)
     {
-        auto current = (*it);
+        auto current = (*it).as<IMFStreamSink>();
 
         DWORD dwCurrId;
         IFR(current->GetIdentifier(&dwCurrId));
@@ -100,8 +97,20 @@ HRESULT Sink::AddStreamSink(
         }
     }
 
-    auto sinkStream = make<StreamSink>(static_cast<uint8_t>(dwStreamSinkIdentifier), pMediaType, *this);
-    m_streamSinks.emplace(it, sinkStream.as<IMFStreamSink>());
+    Windows::Media::MediaProperties::IMediaEncodingProperties encodingProperties = nullptr;
+    IFR(MFCreatePropertiesFromMediaType(pMediaType, guid_of<IMediaEncodingProperties>(), put_abi(encodingProperties)));
+
+    auto sinkStream = CameraCapture::Media::Capture::StreamSink(static_cast<uint8_t>(dwStreamSinkIdentifier), encodingProperties, *this);
+    m_streamSinks.emplace(it, sinkStream);
+
+    if (encodingProperties.Type() == L"Audio")
+    {
+        m_mediaEncodingProfile.Audio(encodingProperties.as<AudioEncodingProperties>());
+    }
+    else if(encodingProperties.Type() == L"Video")
+    {
+        m_mediaEncodingProfile.Video(encodingProperties.as<VideoEncodingProperties>());
+    }
 
     sinkStream.as<IMFStreamSink>().copy_to(ppStreamSink);
 
@@ -114,7 +123,7 @@ HRESULT Sink::RemoveStreamSink(
 {
     Log(L"Sink::RemoveStreamSink()\n");
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -122,7 +131,7 @@ HRESULT Sink::RemoveStreamSink(
     auto itEnd = m_streamSinks.end();
     for (; it != itEnd; ++it)
     {
-        auto current = (*it);
+        auto current = (*it).as<IMFStreamSink>();
 
         DWORD dwId;
         IFR(current->GetIdentifier(&dwId));
@@ -139,12 +148,14 @@ HRESULT Sink::RemoveStreamSink(
 
     m_streamSinks.remove_if([&](auto const& streamSink) -> bool
     {
+        auto mfStreamSink = streamSink.try_as<IMFStreamSink>();
+
         DWORD dwId;
-        if (SUCCEEDED(streamSink->GetIdentifier(&dwId)))
+        if (mfStreamSink != nullptr && SUCCEEDED(mfStreamSink->GetIdentifier(&dwId)))
         {
             if (dwId == dwStreamSinkIdentifier)
             {
-                streamSink.as<winrtStreamSink>().Shutdown();
+                streamSink.Shutdown();
 
                 return true;
             }
@@ -164,7 +175,7 @@ HRESULT Sink::GetStreamSinkCount(
 
     NULL_CHK_HR(pdwStreamSinkCount, E_POINTER);
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -184,7 +195,7 @@ HRESULT Sink::GetStreamSinkByIndex(
 
     *ppStreamSink = nullptr;
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -196,7 +207,7 @@ HRESULT Sink::GetStreamSinkByIndex(
         IFR(MF_E_INVALIDINDEX);
     }
 
-    (*it).copy_to(ppStreamSink);
+    (*it).as<IMFStreamSink>().copy_to(ppStreamSink);
 
     return S_OK;
 }
@@ -212,7 +223,7 @@ HRESULT Sink::GetStreamSinkById(
 
     *ppStreamSink = nullptr;
 
-	std::shared_lock<slim_mutex> slock(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -220,7 +231,8 @@ HRESULT Sink::GetStreamSinkById(
     auto itEnd = m_streamSinks.end();
     do
     {
-        auto sink = *it;
+        auto sink = (*it).as<IMFStreamSink>();
+
         DWORD dwStreamId;
         IFR(sink->GetIdentifier(&dwStreamId));
 
@@ -247,7 +259,7 @@ HRESULT Sink::SetPresentationClock(
 
     NULL_CHK_HR(pPresentationClock, E_INVALIDARG);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -274,7 +286,7 @@ HRESULT Sink::GetPresentationClock(
 
     *ppPresentationClock = nullptr;
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -282,12 +294,7 @@ HRESULT Sink::GetPresentationClock(
     {
         m_presentationClock.copy_to(ppPresentationClock);
     }
-
-	if (m_payloadHandler != nullptr)
-	{
-		m_payloadHandler.QueueMediaProfile(m_mediaEncodingProfile);
-	}
-
+    
     return S_OK;
 }
 
@@ -296,7 +303,7 @@ HRESULT Sink::Shutdown()
 {
     Log(L"Sink::Shutdown()\n");
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     Reset();
 
@@ -312,17 +319,19 @@ HRESULT Sink::OnClockStart(
 {
     Log(L"Sink::OnClockStart()\n");
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
     m_currentState = State::Started;
 
-    for (auto&& sink : m_streamSinks)
+    for (auto&& streamSink : m_streamSinks)
     {
-        IFR(sink.as<winrtStreamSink>().Start(hnsSystemTime, llClockStartOffset));
+        IFR(streamSink.Start(hnsSystemTime, llClockStartOffset));
     }
 
+    QueueEncodingProfile(m_mediaEncodingProfile);
+    
     return S_OK;
 }
 
@@ -334,7 +343,7 @@ HRESULT Sink::OnClockStop(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -342,7 +351,7 @@ HRESULT Sink::OnClockStop(
 
     for (auto&& sink : m_streamSinks)
     {
-        IFR(sink.as<winrtStreamSink>().Stop());
+        IFR(sink.Stop());
     }
 
     return S_OK;
@@ -356,7 +365,7 @@ HRESULT Sink::OnClockPause(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -378,7 +387,7 @@ HRESULT Sink::OnClockRestart(
 
     UNREFERENCED_PARAMETER(hnsSystemTime);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
     IFR(CheckShutdown());
 
@@ -402,9 +411,9 @@ HRESULT Sink::OnClockSetRate(
     UNREFERENCED_PARAMETER(hnsSystemTime);
     UNREFERENCED_PARAMETER(flRate);
 
-	std::lock_guard<slim_mutex> guard(m_mutex);
+    auto guard = m_cs.Guard();
 
-    //IFR(CheckShutdown());
+    IFR(CheckShutdown());
 
     return S_OK;
 }
@@ -417,12 +426,12 @@ HRESULT Sink::OnEndOfStream()
     winrt::com_ptr<IMFPresentationClock> spPresentationClock = nullptr;
 
     {
-		std::shared_lock<slim_mutex> slock(m_mutex);
+        auto guard = m_cs.Guard();
 
         bool initiateshutdown = true;
         for (auto&& streamSink : m_streamSinks)
         {
-            initiateshutdown &= streamSink.as<winrtStreamSink>().State() == State::Eos;
+            initiateshutdown &= streamSink.State() == State::Eos;
         }
 
         if (initiateshutdown)
@@ -451,7 +460,6 @@ void Sink::Reset()
     {
         return;
     }
-
     m_currentState = State::Shutdown;
 
     if (m_payloadHandler != nullptr)
@@ -459,9 +467,10 @@ void Sink::Reset()
         m_payloadHandler = nullptr;
     }
 
-    for (auto&& streamSink : m_streamSinks)
+    while (m_streamSinks.size() > 0)
     {
-        streamSink.as<winrtStreamSink>().Shutdown();
+        m_streamSinks.front().Shutdown();
+        m_streamSinks.pop_front();
     }
     m_streamSinks.clear();
 
@@ -470,5 +479,46 @@ void Sink::Reset()
         m_presentationClock->RemoveClockStateSink(this);
 
         m_presentationClock = nullptr;
+    }
+}
+
+// IPayloadHandler
+void Sink::QueueEncodingProfile(MediaEncodingProfile const& mediaProfile)
+{
+    auto guard = m_cs.Guard();
+
+    if (m_payloadHandler != nullptr)
+    {
+        m_payloadHandler.QueueEncodingProfile(mediaProfile);
+    }
+}
+
+void Sink::QueueMetadata(MediaPropertySet const& metaData)
+{
+    auto guard = m_cs.Guard();
+
+    if (m_payloadHandler != nullptr)
+    {
+        m_payloadHandler.QueueMetadata(metaData);
+    }
+}
+
+void Sink::QueueEncodingProperties(IMediaEncodingProperties const& mediaDescription)
+{
+    auto guard = m_cs.Guard();
+
+    if (m_payloadHandler != nullptr)
+    {
+        m_payloadHandler.QueueEncodingProperties(mediaDescription);
+    }
+}
+
+void Sink::QueuePayload(CameraCapture::Media::Payload const& payload)
+{
+    auto guard = m_cs.Guard();
+
+    if (m_payloadHandler != nullptr)
+    {
+        m_payloadHandler.QueuePayload(payload);
     }
 }
