@@ -13,6 +13,7 @@
 #include <mferror.h>
 #include <mfmediacapture.h>
 
+#include <winrt/Windows.Media.Devices.h>
 #include <pplawait.h>
 
 using namespace winrt;
@@ -55,21 +56,23 @@ CaptureEngine::CaptureEngine()
     , m_stopPreviewOp(nullptr)
     , m_mediaCapture(nullptr)
     , m_initSettings(nullptr)
-	, m_mrcAudioEffect(nullptr)
+    , m_mrcAudioEffect(nullptr)
     , m_mrcVideoEffect(nullptr)
     , m_mrcPreviewEffect(nullptr)
     , m_mediaSink(nullptr)
     , m_payloadHandler(nullptr)
     , m_audioSample(nullptr)
     , m_sharedVideoTexture(nullptr)
-    , m_sharedPhotoTexture(nullptr)
+    , m_photoTexture(nullptr)
+    , m_photoTextureSRV(nullptr)
+    , m_photoSample(nullptr)
     , m_appCoordinateSystem(nullptr)
 {
 }
 
 void CaptureEngine::Shutdown()
 {
-    auto guard = m_cs.Guard();
+    auto strong = get_strong();
 
     if (m_isShutdown)
     {
@@ -80,7 +83,7 @@ void CaptureEngine::Shutdown()
     // see if any outstanding operations are running
     if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
     {
-        concurrency::create_task([this]()
+        concurrency::create_task([this, strong]()
             {
                 WaitForSingleObject(m_startPreviewEventHandle.get(), INFINITE);
             }).get();
@@ -88,7 +91,7 @@ void CaptureEngine::Shutdown()
 
     if (m_takePhotoOp != nullptr && m_takePhotoOp.Status() == AsyncStatus::Started)
     {
-        concurrency::create_task([this]()
+        concurrency::create_task([this, strong]()
             {
                 WaitForSingleObject(m_takePhotoEventHandle.get(), INFINITE);
             }).get();
@@ -101,7 +104,7 @@ void CaptureEngine::Shutdown()
 
     if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
     {
-        concurrency::create_task([this]()
+        concurrency::create_task([this, strong]()
             {
                 WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
             }).get();
@@ -125,7 +128,7 @@ void CaptureEngine::Shutdown()
 
 hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc)
 {
-    auto guard = m_cs.Guard();
+    auto strong = get_strong();
 
     if (m_startPreviewOp != nullptr)
     {
@@ -137,10 +140,8 @@ hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
     IFR(CreateDeviceResources());
 
     m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([this, strong = get_strong()](auto&& /*sender*/, auto&& status)
+    m_startPreviewOp.Completed([this, strong](auto&& /*sender*/, auto&& status)
     {
-        auto guard = m_cs.Guard();
-
         m_startPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
@@ -167,7 +168,7 @@ hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 
 hresult CaptureEngine::StopPreview()
 {
-    auto guard = m_cs.Guard();
+    auto strong = get_strong();
 
     if (m_stopPreviewOp != nullptr)
     {
@@ -177,10 +178,8 @@ hresult CaptureEngine::StopPreview()
     ResetEvent(m_stopPreviewEventHandle.get());
 
     m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([this, strong = get_strong()](auto&& /*sender*/, auto&& status)
+    m_stopPreviewOp.Completed([this, strong](auto&& /*sender*/, auto&& status)
     {
-        auto guard = m_cs.Guard();
-
         m_stopPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
@@ -207,7 +206,7 @@ hresult CaptureEngine::StopPreview()
 
 hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc)
 {
-    auto guard = m_cs.Guard();
+    auto strong = get_strong();
 
     if (m_takePhotoOp)
     {
@@ -219,10 +218,8 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
     IFR(CreateDeviceResources());
 
     m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc);
-    m_takePhotoOp.Completed([this, strong = get_strong()](auto const& result, auto&& status)
+    m_takePhotoOp.Completed([this, strong](auto&& /*result*/, auto&& status)
     {
-        auto guard = m_cs.Guard();
-
         m_takePhotoOp = nullptr;
 
         if (status == AsyncStatus::Error)
@@ -240,50 +237,20 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
 
             state.value.captureState.stateType = CaptureStateType::PhotoFrame;
 
-            auto payload = result.GetResults();
-            if (payload != nullptr)
-            {
-                auto streamSample = payload.as<IStreamSample>();
-                if (streamSample != nullptr)
-                {
-                    auto videoProps = payload.EncodingProperties().as<ImageEncodingProperties>();
+            // Set state values
+            state.value.captureState.width = m_photoTextureDesc.Width;
+            state.value.captureState.height = m_photoTextureDesc.Height;
+            state.value.captureState.texturePtr = m_photoTextureSRV.get();
 
-                    if (m_sharedPhotoTexture == nullptr
-                        ||
-                        m_sharedPhotoTexture->frameTexture == nullptr
-                        ||
-                        m_sharedPhotoTexture->frameTextureDesc.Width != videoProps.Width()
-                        ||
-                        m_sharedPhotoTexture->frameTextureDesc.Height != videoProps.Height())
-                    {
-                        auto resources = m_d3d11DeviceResources.lock();
-                        NULL_CHK_R(resources);
-
-                        // make sure we have created our own d3d device
-                        IFV(CreateDeviceResources());
-
-                        IFV(SharedTexture::Create(resources->GetDevice(), m_dxgiDeviceManager, videoProps.Width(), videoProps.Height(), m_sharedPhotoTexture));
-                    }
-
-                    // copy the data
-                    IFV(CopySample(MFMediaType_Video, streamSample->Sample(), m_sharedPhotoTexture->mediaSample));
-
-                    // Set state values
-                    state.value.captureState.width = m_sharedPhotoTexture->frameTextureDesc.Width;
-                    state.value.captureState.height = m_sharedPhotoTexture->frameTextureDesc.Height;
-                    state.value.captureState.texturePtr = m_sharedPhotoTexture->frameTextureSRV.get();
-
-                    // if there is transform change, update matricies
-                    if (m_appCoordinateSystem != nullptr)
-                    {
-                        if (SUCCEEDED(m_sharedPhotoTexture->UpdateTransforms(m_appCoordinateSystem)))
-                        {
-                            state.value.captureState.worldMatrix = m_sharedPhotoTexture->cameraToWorldTransform;
-                            state.value.captureState.projectionMatrix = m_sharedPhotoTexture->cameraProjectionMatrix;
-                        }
-                    }
-                }
-            }
+            // if there is transform change, update matricies
+            //if (m_appCoordinateSystem != nullptr)
+            //{
+            //    if (SUCCEEDED(m_sharedPhotoTexture->UpdateTransforms(m_appCoordinateSystem)))
+            //    {
+            //        state.value.captureState.worldMatrix = m_sharedPhotoTexture->cameraToWorldTransform;
+            //        state.value.captureState.projectionMatrix = m_sharedPhotoTexture->cameraProjectionMatrix;
+            //    }
+            //}
 
             Callback(state);
         }
@@ -292,15 +259,14 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
     return S_OK;
 }
 
+
 CameraCapture::Media::PayloadHandler CaptureEngine::PayloadHandler()
 {
-    auto guard = m_cs.Guard();
-
     return m_payloadHandler;
 }
 void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& value)
 {
-    auto guard = m_cs.Guard();
+    auto strong = get_strong();
 
     m_payloadHandler = value;
 
@@ -309,10 +275,8 @@ void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& v
         m_mediaSink.PayloadHandler(m_payloadHandler);
     }
 
-    m_payloadEventRevoker = m_payloadHandler.OnStreamPayload(winrt::auto_revoke, [this, strong = get_strong()](auto const sender, Media::Payload const& payload)
+    m_payloadEventRevoker = m_payloadHandler.OnStreamPayload(winrt::auto_revoke, [this, strong](auto const sender, Media::Payload const& payload)
         {
-            UNREFERENCED_PARAMETER(sender);
-
             if (m_isShutdown)
             {
                 return;
@@ -507,11 +471,14 @@ void CaptureEngine::ReleaseDeviceResources()
         m_sharedVideoTexture = nullptr;
     }
 
-    if (m_sharedPhotoTexture != nullptr)
+    if (m_photoTexture != nullptr)
     {
-        m_sharedPhotoTexture->Reset();
+        m_photoTexture = nullptr;
+    }
 
-        m_sharedPhotoTexture = nullptr;
+    if (m_photoTextureSRV != nullptr)
+    {
+        m_photoTextureSRV = nullptr;
     }
 
     if (m_dxgiDeviceManager != nullptr)
@@ -537,23 +504,21 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     uint32_t width, uint32_t height,
     boolean enableAudio, boolean enableMrc)
 {
+    auto strong = get_strong();
+
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
 
+    if (m_mediaCapture == nullptr)
     {
-        auto guard = m_cs.Guard();
-
-        if (m_mediaCapture == nullptr)
-        {
-            co_await CreateMediaCaptureAsync(width, height, enableAudio);
-        }
-        else
-        {
-            co_await RemoveMrcEffectsAsync();
-        }
+        co_await CreateMediaCaptureAsync(width, height, enableAudio);
     }
-    
+    else
+    {
+        co_await RemoveMrcEffectsAsync();
+    }
+
     // set video controller properties
     auto videoController = m_mediaCapture.VideoDeviceController();
     videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
@@ -682,26 +647,41 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
     co_await calling_thread;
 }
 
-
-IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine(
+IAsyncAction CaptureEngine::TakePhotoCoroutine(
     uint32_t const width,
     uint32_t const height,
     boolean const enableMrc)
 {
+    auto strong = get_strong();
+
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
 
+    auto createdCapture = false;
     if (m_mediaCapture == nullptr)
     {
         co_await CreateMediaCaptureAsync(width, height, false);
+
+        createdCapture = true;
+    }
+
+    auto isStreaming = m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming;
+    if (!isStreaming)
+    {
+        co_await StartPreviewCoroutine(width, height, false, enableMrc);
     }
 
     auto captureSettings = m_mediaCapture.MediaCaptureSettings();
 
     auto characteristic = captureSettings.VideoDeviceCharacteristic();
 
-    if (enableMrc)
+    auto addedEffect = false;
+    if (enableMrc 
+        &&
+        characteristic != VideoDeviceCharacteristic::AllStreamsIndependent 
+        &&
+        characteristic != VideoDeviceCharacteristic::PreviewPhotoStreamsIdentical)
     {
         try
         {
@@ -714,6 +694,8 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
         {
             Log(L"can't add the mrc extension - %s", error.message().c_str());
         }
+
+        addedEffect = true;
     }
 
     // set video controller properties
@@ -728,6 +710,15 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
     }
 
     auto photoProps = videoController.GetMediaStreamProperties(MediaStreamType::Photo).as<VideoEncodingProperties>();
+
+    if (m_photoSample == nullptr
+        ||
+        m_photoTextureDesc.Width != photoProps.Width()
+        ||
+        m_photoTextureDesc.Height != photoProps.Height())
+    {
+        CreatePhotoTexture(photoProps.Width(), photoProps.Height());
+    }
 
     auto encProperties = ImageEncodingProperties::CreateUncompressed(MediaPixelFormat::Bgra8);
     encProperties.Width(photoProps.Width());
@@ -750,34 +741,37 @@ IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine
         com_ptr<IMFSample> spSample = nullptr;
         IFT(spService->GetService(MF_WRAPPED_SAMPLE_SERVICE, __uuidof(IMFSample), spSample.put_void()));
 
-        payload = CameraCapture::Media::Payload();
-        auto streamSample = payload.try_as<IStreamSample>();
-        if (streamSample != nullptr)
-        {
-            IFT(streamSample->Sample(MFMediaType_Video, mediaType, spSample));
-        }
-    }
-
-    try
-    {
-        if (characteristic == VideoDeviceCharacteristic::AllStreamsIndependent ||
-            characteristic != VideoDeviceCharacteristic::RecordPhotoStreamsIdentical)
-        {
-            co_await m_mediaCapture.ClearEffectsAsync(MediaStreamType::Photo);
-        }
-    }
-    catch (hresult_error const& error)
-    {
-        Log(L"can't clear the mrc extension - %s", error.message().c_str());
+        // copy the data
+        IFV(CopySample(MFMediaType_Video, spSample, m_photoSample));
     }
 
     co_await photoCapture.FinishAsync();
 
+    if (addedEffect)
+    {
+        try
+        {
+            co_await m_mediaCapture.ClearEffectsAsync(MediaStreamType::Photo);
+        }
+        catch (hresult_error const& error)
+        {
+            Log(L"can't clear the mrc extension - %s", error.message().c_str());
+        }
+    }
+
+    if (!isStreaming)
+    {
+        co_await m_mediaCapture.StopPreviewAsync();
+    }
+
+    if (createdCapture)
+    {
+        co_await ReleaseMediaCaptureAsync();
+    }
+
     SetEvent(m_takePhotoEventHandle.get());
 
     co_await calling_thread;
-
-    co_return payload;
 }
 
 
@@ -961,7 +955,7 @@ IAsyncAction CaptureEngine::AddMrcEffectsAsync(
     }
     catch (hresult_error const& e)
     {
-        Log(L"failed to add Mrc effects to streams: %s", e.message().c_str());
+        Log(L"failed to add Mrc effects to streams: %s\n", e.message().c_str());
     }
 
     co_return;
@@ -974,28 +968,68 @@ IAsyncAction CaptureEngine::RemoveMrcEffectsAsync()
         co_return;
     }
 
-	if (m_mrcAudioEffect != nullptr || m_mrcPreviewEffect != nullptr || m_mrcVideoEffect != nullptr)
-	{
-		if (m_mrcAudioEffect != nullptr)
-		{
-			co_await m_mediaCapture.RemoveEffectAsync(m_mrcAudioEffect);
-			m_mrcAudioEffect = nullptr;
-		}
+    if (m_mrcAudioEffect != nullptr || m_mrcPreviewEffect != nullptr || m_mrcVideoEffect != nullptr)
+    {
+        if (m_mrcAudioEffect != nullptr)
+        {
+            co_await m_mediaCapture.RemoveEffectAsync(m_mrcAudioEffect);
+            m_mrcAudioEffect = nullptr;
+        }
 
-		if (m_mrcPreviewEffect != nullptr)
-		{
-			co_await m_mediaCapture.RemoveEffectAsync(m_mrcPreviewEffect);
-			m_mrcPreviewEffect = nullptr;
-		}
+        if (m_mrcPreviewEffect != nullptr)
+        {
+            co_await m_mediaCapture.RemoveEffectAsync(m_mrcPreviewEffect);
+            m_mrcPreviewEffect = nullptr;
+        }
 
-		if (m_mrcVideoEffect != nullptr)
-		{
-			co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
-			m_mrcVideoEffect = nullptr;
-		}
+        if (m_mrcVideoEffect != nullptr)
+        {
+            co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
+            m_mrcVideoEffect = nullptr;
+        }
     }
     else
     {
         co_return;
     }
+}
+
+hresult CaptureEngine::CreatePhotoTexture(uint32_t width, uint32_t height)
+{
+    auto resources = m_d3d11DeviceResources.lock();
+    NULL_CHK_HR(resources, MF_E_UNEXPECTED);
+
+    com_ptr<IDXGIAdapter> dxgiAdapter = nullptr;
+    auto d3dDevice = resources->GetDevice();
+
+    auto desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, width, height);
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+    desc.MipLevels = 1;
+    desc.MiscFlags = 0;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+
+    com_ptr<ID3D11Texture2D> photoTexture = nullptr;
+    IFR(d3dDevice->CreateTexture2D(&desc, nullptr, photoTexture.put()));
+
+    auto srvDesc = CD3D11_SHADER_RESOURCE_VIEW_DESC(photoTexture.get(), D3D11_SRV_DIMENSION_TEXTURE2D);
+
+    com_ptr<ID3D11ShaderResourceView> srv = nullptr;
+    IFR(d3dDevice->CreateShaderResourceView(photoTexture.get(), &srvDesc, srv.put()));
+
+    // create a media buffer for the texture
+    com_ptr<IMFMediaBuffer> dxgiMediaBuffer = nullptr;
+    IFR(MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D), photoTexture.get(), 0, /*fBottomUpWhenLinear*/false, dxgiMediaBuffer.put()));
+
+    // create a sample with the buffer
+    com_ptr<IMFSample> mediaSample = nullptr;
+    IFR(MFCreateSample(mediaSample.put()));
+
+    IFR(mediaSample->AddBuffer(dxgiMediaBuffer.get()));
+
+    m_photoTextureDesc = desc;
+    m_photoTexture = photoTexture;
+    m_photoTextureSRV = srv;
+    m_photoSample = mediaSample;
+
+    return S_OK;
 }

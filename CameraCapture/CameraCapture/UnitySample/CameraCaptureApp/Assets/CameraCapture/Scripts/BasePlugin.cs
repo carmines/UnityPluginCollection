@@ -95,6 +95,48 @@ namespace CameraCapture
 
     internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
     {
+        // TODO: il2cpp doesn't support generics for static method callback
+        [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
+        internal static void PInvokeCallbackHandler(IntPtr senderPtr, Wrapper.CallbackState args)
+        {
+            if (senderPtr == IntPtr.Zero)
+            {
+                Debug.LogError("OnCallback: senderPtr is null.");
+
+                return;
+            }
+
+            GCHandle handle = default(GCHandle);
+            try
+            {
+                handle = GCHandle.FromIntPtr(senderPtr);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("OnCallback: " + ex.Message);
+
+                return;
+            }
+
+            // check if this is of correct type
+            if (handle.Target is CameraCapture)
+            {
+                var thisObject = (CameraCapture)handle.Target;
+                thisObject.CompleteCallback(args);
+            }
+            //else if (handle.Target is OtherClass)
+            //{
+            //    var thisObject = (OtherClass)handle.Target;
+            //    thisObject.CompleteCallback(args);
+            //}
+            else
+            {
+                Debug.LogError("OnCallback: senderPtr is not null, but not of correct type.");
+
+                return;
+            }
+        }
+
         // callback handler for derived class
         protected abstract void OnCallback(Wrapper.CallbackType type, Wrapper.CallbackState args);
 
@@ -106,8 +148,7 @@ namespace CameraCapture
 
         // delegate function used for callback, uses CallbackWrapper static method
         protected Wrapper.StateChangedCallback stateChangedCallback
-            // = new Wrapper.StateChangedCallback(CallbackWrapper<T>.OnCallback);
-            = new Wrapper.StateChangedCallback(CallbackWrapper.OnCallback);
+            = new Wrapper.StateChangedCallback(PInvokeCallbackHandler);
 
         // pin GC memory location for the object
         protected GCHandle thisObject = default(GCHandle);
@@ -200,7 +241,7 @@ namespace CameraCapture
             yield return null;
         }
 
-        private void OnFailed(Wrapper.FailedState args)
+        protected virtual void OnFailed(Wrapper.FailedState args)
         {
             // failed could be called on a non-ui thread, see OnUpdate
             // TODO: queue up special actions that can be processed on the next Update pass
@@ -217,6 +258,26 @@ namespace CameraCapture
             return hresult;
         }
 
+        internal void CompleteCallback(Wrapper.CallbackState args)
+        {
+#if UNITY_WSA_10_0
+            if (!UnityEngine.WSA.Application.RunningOnAppThread())
+            {
+                UnityEngine.WSA.Application.InvokeOnAppThread(() =>
+                {
+                    OnStateChanged(args);
+                }, false);
+            }
+            else
+            {
+                OnStateChanged(args);
+            }
+#else
+            // there is still a chance the callback is on a non AppThread(callbacks genereated from WaitForEndOfFrame are not)
+            // this will process the callback on AppThread on a FixedUpdate
+            OnStateChanged(args);
+#endif
+        }
 
         internal void OnStateChanged(Wrapper.CallbackState args)
         {

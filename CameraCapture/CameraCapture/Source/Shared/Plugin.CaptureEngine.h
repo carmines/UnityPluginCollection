@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 #pragma once
@@ -46,7 +46,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
         Windows::Foundation::IAsyncAction StopPreviewCoroutine();
-        Windows::Foundation::IAsyncOperation<Media::Payload> TakePhotoCoroutine(uint32_t const width, uint32_t const height, boolean const enableMrc);
+        Windows::Foundation::IAsyncAction TakePhotoCoroutine(uint32_t const width, uint32_t const height, boolean const enableMrc);
 
         Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(uint32_t const& width, uint32_t const& height, boolean const& enableAudio);
         Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
@@ -54,8 +54,9 @@ namespace winrt::CameraCapture::Plugin::implementation
         Windows::Foundation::IAsyncAction AddMrcEffectsAsync(boolean const enableAudio);
         Windows::Foundation::IAsyncAction RemoveMrcEffectsAsync();
 
+        hresult CreatePhotoTexture(uint32_t width, uint32_t height);
+
     private:
-        CriticalSection m_cs;
         std::atomic<boolean> m_isShutdown;
         winrt::handle m_startPreviewEventHandle;
         winrt::handle m_stopPreviewEventHandle;
@@ -67,7 +68,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction m_startPreviewOp;
         Windows::Foundation::IAsyncAction m_stopPreviewOp;
-        Windows::Foundation::IAsyncOperation<Media::Payload> m_takePhotoOp;
+        Windows::Foundation::IAsyncAction m_takePhotoOp;
 
         // media capture
         Windows::Media::Capture::MediaCategory m_category;
@@ -90,7 +91,11 @@ namespace winrt::CameraCapture::Plugin::implementation
         // buffers
         com_ptr<IMFSample> m_audioSample;
         com_ptr<SharedTexture> m_sharedVideoTexture;
-        com_ptr<SharedTexture> m_sharedPhotoTexture;
+
+        CD3D11_TEXTURE2D_DESC m_photoTextureDesc;
+        com_ptr<ID3D11Texture2D> m_photoTexture;
+        com_ptr<ID3D11ShaderResourceView> m_photoTextureSRV;
+        com_ptr<IMFSample> m_photoSample;
 
         Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };
