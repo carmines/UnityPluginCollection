@@ -9,7 +9,6 @@
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="UWP_TemporaryKey.pfx" />
     <None Include="PropertySheet.props" />
     <None Include="packages.config" />
   </ItemGroup>

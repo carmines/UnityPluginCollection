@@ -66,6 +66,7 @@ CaptureEngine::CaptureEngine()
     , m_photoTexture(nullptr)
     , m_photoTextureSRV(nullptr)
     , m_photoSample(nullptr)
+    , m_photoTransforms(nullptr)
     , m_appCoordinateSystem(nullptr)
 {
 }
@@ -243,14 +244,19 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
             state.value.captureState.texturePtr = m_photoTextureSRV.get();
 
             // if there is transform change, update matricies
-            //if (m_appCoordinateSystem != nullptr)
-            //{
-            //    if (SUCCEEDED(m_sharedPhotoTexture->UpdateTransforms(m_appCoordinateSystem)))
-            //    {
-            //        state.value.captureState.worldMatrix = m_sharedPhotoTexture->cameraToWorldTransform;
-            //        state.value.captureState.projectionMatrix = m_sharedPhotoTexture->cameraProjectionMatrix;
-            //    }
-            //}
+            if (m_appCoordinateSystem != nullptr)
+            {
+                if (m_photoTransforms == nullptr)
+                {
+                    m_photoTransforms = Media::implementation::Transform::Create(m_photoSample);
+                }
+
+                if (SUCCEEDED(m_photoTransforms.Update(m_appCoordinateSystem)))
+                {
+                    state.value.captureState.worldMatrix = m_photoTransforms.CameraToWorldTransform();
+                    state.value.captureState.projectionMatrix = m_photoTransforms.CameraProjectionMatrix();
+                }
+            }
 
             Callback(state);
         }
@@ -389,8 +395,8 @@ void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& v
                 {
                     if (SUCCEEDED(m_sharedVideoTexture->UpdateTransforms(m_appCoordinateSystem)))
                     {
-                        state.value.captureState.worldMatrix = m_sharedVideoTexture->cameraToWorldTransform;
-                        state.value.captureState.projectionMatrix = m_sharedVideoTexture->cameraProjectionMatrix;
+                        state.value.captureState.worldMatrix = m_sharedVideoTexture->transforms.CameraToWorldTransform();
+                        state.value.captureState.projectionMatrix = m_sharedVideoTexture->transforms.CameraProjectionMatrix();
 
                         bufferChanged = true;
                     }

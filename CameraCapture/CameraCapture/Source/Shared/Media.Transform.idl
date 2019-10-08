@@ -1,0 +1,23 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+#pragma once
+
+import "Media.Payload.idl";
+
+namespace CameraCapture.Media
+{
+    [marshaling_behavior(agile)]
+    [threading(both)]
+    [version(1.0)]
+    runtimeclass Transform
+    {
+        Transform();
+
+        HRESULT Update(Windows.Perception.Spatial.SpatialCoordinateSystem appCoordinateSystem);
+        void Reset();
+
+        Windows.Foundation.Numerics.Matrix4x4 CameraToWorldTransform{ get; };
+        Windows.Foundation.Numerics.Matrix4x4 CameraProjectionMatrix{ get; };
+    };
+}

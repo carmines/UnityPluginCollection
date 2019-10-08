@@ -8,6 +8,7 @@
 #include "Media.PayloadHandler.h"
 #include "Media.SharedTexture.h"
 #include "Media.Capture.Sink.h"
+#include "Media.Transform.h"
 
 #include <mfapi.h>
 #include <winrt/windows.media.h>
@@ -96,6 +97,7 @@ namespace winrt::CameraCapture::Plugin::implementation
         com_ptr<ID3D11Texture2D> m_photoTexture;
         com_ptr<ID3D11ShaderResourceView> m_photoTextureSRV;
         com_ptr<IMFSample> m_photoSample;
+        CameraCapture::Media::Transform m_photoTransforms;
 
         Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };

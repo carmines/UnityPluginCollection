@@ -136,7 +136,6 @@ copy /Y "$(TargetDir)$(TargetName).pdb" "$(SolutionDir)CameraCapture\UnitySample
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="UWP_TemporaryKey.pfx" />
     <None Include="PropertySheet.props">
       <SubType>Designer</SubType>
     </None>
