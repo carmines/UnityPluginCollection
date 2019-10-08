@@ -300,7 +300,6 @@ namespace CameraCapture
                     }
 
                     videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
-                    videoTexture.wrapMode = TextureWrapMode.Clamp;
 
                     if (VideoRenderer != null)
                     {
@@ -365,7 +364,6 @@ namespace CameraCapture
                         photoTexture.wrapMode = TextureWrapMode.Clamp;
                     }
                     photoTexture.UpdateExternalTexture(state.imgTexture);
-                    photoTexture.Apply();
 
                     copyTexture = CopyTexture(photoTexture, flipImage);
 
