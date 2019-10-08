@@ -28,8 +28,6 @@ namespace CameraCapture
         private Texture2D videoTexture = null;
         private Texture2D photoTexture = null;
 
-        private Texture2D videoTexture = null;
-        private Texture2D photoTexture = null;
         private IntPtr spatialCoordinateSystemPtr = IntPtr.Zero;
 
         TaskCompletionSource<Wrapper.CaptureState> startPreviewCompletionSource = null;
