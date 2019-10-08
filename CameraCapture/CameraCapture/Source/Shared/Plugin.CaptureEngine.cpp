@@ -730,8 +730,6 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
 
     auto frame = capturedPhoto.Frame();
 
-    Media::Payload payload = nullptr;
-
     com_ptr<IMFGetService> spService = frame.try_as<IMFGetService>();
     if (spService != nullptr)
     {
