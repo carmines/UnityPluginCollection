@@ -93,7 +93,7 @@ namespace CameraCapture
         internal static extern Int32 CreateCapture([MarshalAs(UnmanagedType.FunctionPtr)]Wrapper.StateChangedCallback callback, IntPtr objectPtr, out Int32 instanceId);
     }
 
-    internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
+    internal static class CallbackWrapper
     {
         // TODO: il2cpp doesn't support generics for static method callback
         [AOT.MonoPInvokeCallback(typeof(Wrapper.StateChangedCallback))]
@@ -136,7 +136,10 @@ namespace CameraCapture
                 return;
             }
         }
+    }
 
+    internal abstract class BasePlugin<T> : MonoBehaviour where T : BasePlugin<T>
+    {
         // callback handler for derived class
         protected abstract void OnCallback(Wrapper.CallbackType type, Wrapper.CallbackState args);
 
@@ -148,7 +151,7 @@ namespace CameraCapture
 
         // delegate function used for callback, uses CallbackWrapper static method
         protected Wrapper.StateChangedCallback stateChangedCallback
-            = new Wrapper.StateChangedCallback(PInvokeCallbackHandler);
+            = new Wrapper.StateChangedCallback(CallbackWrapper.PInvokeCallbackHandler);
 
         // pin GC memory location for the object
         protected GCHandle thisObject = default(GCHandle);

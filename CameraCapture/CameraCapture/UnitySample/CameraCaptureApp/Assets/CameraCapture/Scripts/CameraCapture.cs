@@ -31,7 +31,6 @@ namespace CameraCapture
 
         TaskCompletionSource<Wrapper.CaptureState> startPreviewCompletionSource = null;
         TaskCompletionSource<Wrapper.CaptureState> stopCompletionSource = null;
-        TaskCompletionSource<Wrapper.CaptureState> nextFrameCompletionSource = null;
         TaskCompletionSource<Wrapper.CaptureState> photoCompletionSource = null;
 
         private KeywordRecognizer keywordRecognizer;
@@ -132,7 +131,6 @@ namespace CameraCapture
         {
             startPreviewCompletionSource?.TrySetCanceled();
             stopCompletionSource?.TrySetCanceled();
-            nextFrameCompletionSource?.TrySetCanceled();
             photoCompletionSource?.TrySetCanceled();
 
             if (VideoRenderer != null)
@@ -172,7 +170,7 @@ namespace CameraCapture
                         //Debug.Log("PreviewAudioFrame");
                         break;
                     case Wrapper.CaptureStateType.PreviewVideoFrame:
-                        nextFrameCompletionSource?.TrySetResult(args.CaptureState);
+                        OnPreviewFrameChanged(args.CaptureState);
                         break;
                     case Wrapper.CaptureStateType.PhotoFrame:
                         photoCompletionSource?.TrySetResult(args.CaptureState);
@@ -188,8 +186,6 @@ namespace CameraCapture
             startPreviewCompletionSource?.TrySetCanceled();
 
             stopCompletionSource?.TrySetCanceled();
-
-            nextFrameCompletionSource?.TrySetCanceled();
 
             photoCompletionSource?.TrySetCanceled();
         }
@@ -227,8 +223,6 @@ namespace CameraCapture
                 try
                 {
                     await startPreviewCompletionSource.Task;
-
-                    await WaitForNextFrameAsync(width, height);
                 }
                 catch (Exception ex)
                 {
@@ -250,7 +244,6 @@ namespace CameraCapture
         public async Task<bool> StopPreviewAsync()
         {
             stopCompletionSource?.TrySetCanceled();
-            nextFrameCompletionSource?.TrySetCanceled();
 
             var hr = Native.StopPreview(instanceId);
             if (hr == 0)
@@ -280,59 +273,35 @@ namespace CameraCapture
             return CheckHR(hr) == 0;
         }
 
-        private async Task<bool> WaitForNextFrameAsync(int width, int height)
+        private void OnPreviewFrameChanged(Wrapper.CaptureState state)
         {
-            nextFrameCompletionSource?.TrySetCanceled();
+            var sizeChanged = false;
 
-            nextFrameCompletionSource = new TaskCompletionSource<Wrapper.CaptureState>();
-            try
+            if (videoTexture == null)
             {
-                var state = await nextFrameCompletionSource.Task;
-
-                if (videoTexture == null)
+                if (state.width != Width || state.height != Height)
                 {
-                    if (state.width != width || state.height != height)
-                    {
-                        Debug.LogWarningFormat("Video texture does not match the size requested, using {0} x {1}", state.width, state.height);
-                    }
-
-                    videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
-
-                    if (VideoRenderer != null)
-                    {
-                        VideoRenderer.enabled = true;
-                        VideoRenderer.sharedMaterial.SetTexture("_MainTex", videoTexture);
-                        VideoRenderer.sharedMaterial.SetTextureScale("_MainTex", new Vector2(1, -1)); // flip texture
-                    }
-                }
-                else if (videoTexture.width != state.width || videoTexture.height != state.height)
-                {
-                    Debug.LogWarningFormat("Video texture size changed, using {0} x {1}", state.width, state.height);
-
-                    videoTexture.UpdateExternalTexture(state.imgTexture);
+                    Debug.Log("Video texture does not match the size requested, using " + state.width + " x " + state.height);
                 }
 
-                if (CameraTracker != null)
-                {
-                    CameraTracker.UpdateCameraMatrices(state.cameraWorld, state.cameraProjection);
-                }
+                videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
 
-                nextFrameCompletionSource = null;
-
-                await WaitForNextFrameAsync(width, height);
+                sizeChanged = true;
             }
-            catch (Exception ex)
+            else if (videoTexture.width != state.width || videoTexture.height != state.height)
             {
-                Debug.LogError(ex.Message);
-                if (nextFrameCompletionSource != null)
-                {
-                    nextFrameCompletionSource.TrySetException(ex);
-                }
+                Debug.Log("Video texture size changed, using " + state.width + " x " + state.height);
 
-                return false;
+                videoTexture.UpdateExternalTexture(state.imgTexture);
+
+                sizeChanged = true;
             }
 
-            return true;
+            if (sizeChanged)
+            {
+                Width = state.width;
+                Height = state.height;
+            }
         }
 
         public async Task<Texture2D> TakePhotoAsync(int width, int height, bool useMrc, bool flipImage = false)
