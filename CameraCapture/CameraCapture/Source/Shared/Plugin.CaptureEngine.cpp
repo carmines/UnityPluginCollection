@@ -666,12 +666,6 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
         createdCapture = true;
     }
 
-    auto isStreaming = m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming;
-    if (!isStreaming)
-    {
-        co_await StartPreviewCoroutine(width, height, false, enableMrc);
-    }
-
     auto captureSettings = m_mediaCapture.MediaCaptureSettings();
 
     auto characteristic = captureSettings.VideoDeviceCharacteristic();
@@ -728,9 +722,7 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
 
     auto capturedPhoto = co_await photoCapture.CaptureAsync();
 
-    auto frame = capturedPhoto.Frame();
-
-    com_ptr<IMFGetService> spService = frame.try_as<IMFGetService>();
+    com_ptr<IMFGetService> spService = capturedPhoto.Frame().try_as<IMFGetService>();
     if (spService != nullptr)
     {
         com_ptr<IMFMediaType> mediaType = nullptr;
@@ -755,11 +747,6 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
         {
             Log(L"can't clear the mrc extension - %s", error.message().c_str());
         }
-    }
-
-    if (!isStreaming)
-    {
-        co_await m_mediaCapture.StopPreviewAsync();
     }
 
     if (createdCapture)

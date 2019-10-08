@@ -122,6 +122,16 @@ namespace CameraCapture
                 TakePhoto();
             });
 
+            keywords.Add("start preview", () =>
+            {
+                StartPreview();
+            });
+
+            keywords.Add("stop preview", () =>
+            {
+                StopPreview();
+            });
+
             keywordRecognizer = new KeywordRecognizer(keywords.Keys.ToArray());
             keywordRecognizer.OnPhraseRecognized += KeywordRecognizer_OnPhraseRecognized;
             keywordRecognizer.Start();
@@ -176,6 +186,49 @@ namespace CameraCapture
                         photoCompletionSource?.TrySetResult(args.CaptureState);
                         break;
                 }
+            }
+        }
+
+        private void OnPreviewFrameChanged(Wrapper.CaptureState state)
+        {
+            var sizeChanged = false;
+
+            if (videoTexture == null)
+            {
+                if (state.width != Width || state.height != Height)
+                {
+                    Debug.Log("Video texture does not match the size requested, using " + state.width + " x " + state.height);
+                }
+
+                videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
+
+                sizeChanged = true;
+
+                if (VideoRenderer != null)
+                {
+                    VideoRenderer.enabled = true;
+                    VideoRenderer.sharedMaterial.SetTexture("_MainTex", videoTexture);
+                    VideoRenderer.sharedMaterial.SetTextureScale("_MainTex", new Vector2(1, -1)); // flip texture
+                }
+            }
+            else if (videoTexture.width != state.width || videoTexture.height != state.height)
+            {
+                Debug.Log("Video texture size changed, using " + state.width + " x " + state.height);
+
+                videoTexture.UpdateExternalTexture(state.imgTexture);
+
+                sizeChanged = true;
+            }
+
+            if (sizeChanged)
+            {
+                Width = state.width;
+                Height = state.height;
+            }
+
+            if (CameraTracker != null)
+            {
+                CameraTracker.UpdateCameraMatrices(state.cameraWorld, state.cameraProjection);
             }
         }
 
@@ -271,37 +324,6 @@ namespace CameraCapture
             videoTexture = null;
 
             return CheckHR(hr) == 0;
-        }
-
-        private void OnPreviewFrameChanged(Wrapper.CaptureState state)
-        {
-            var sizeChanged = false;
-
-            if (videoTexture == null)
-            {
-                if (state.width != Width || state.height != Height)
-                {
-                    Debug.Log("Video texture does not match the size requested, using " + state.width + " x " + state.height);
-                }
-
-                videoTexture = Texture2D.CreateExternalTexture(state.width, state.height, TextureFormat.BGRA32, false, false, state.imgTexture);
-
-                sizeChanged = true;
-            }
-            else if (videoTexture.width != state.width || videoTexture.height != state.height)
-            {
-                Debug.Log("Video texture size changed, using " + state.width + " x " + state.height);
-
-                videoTexture.UpdateExternalTexture(state.imgTexture);
-
-                sizeChanged = true;
-            }
-
-            if (sizeChanged)
-            {
-                Width = state.width;
-                Height = state.height;
-            }
         }
 
         public async Task<Texture2D> TakePhotoAsync(int width, int height, bool useMrc, bool flipImage = false)
