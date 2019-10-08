@@ -259,9 +259,9 @@ namespace CameraCapture
             await StopPreviewAsync();
         }
 
-        public async Task<Texture2D> TakePhoto()
+        public async void TakePhoto()
         {
-            return await TakePhotoAsync(Width, Height, true, true);
+            await TakePhotoAsync(Width, Height, true, true);
         }
 
         public async Task<bool> StartPreviewAsync(int width, int height, bool enableAudio, bool useMrc)
