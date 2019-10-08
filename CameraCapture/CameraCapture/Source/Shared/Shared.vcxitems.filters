@@ -35,6 +35,9 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.cpp">
       <Filter>Media</Filter>
     </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Media.Transform.cpp">
+      <Filter>Media</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)pch.h" />
@@ -89,6 +92,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.h">
       <Filter>Media</Filter>
     </ClInclude>
+    <ClInclude Include="$(MSBuildThisFileDirectory)Media.Transform.h">
+      <Filter>Media</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Midl Include="$(MSBuildThisFileDirectory)Plugin.Module.idl">
@@ -116,6 +122,9 @@
       <Filter>Media</Filter>
     </Midl>
     <Midl Include="$(MSBuildThisFileDirectory)Media.PayloadHandler.idl">
+      <Filter>Media</Filter>
+    </Midl>
+    <Midl Include="$(MSBuildThisFileDirectory)Media.Transform.idl">
       <Filter>Media</Filter>
     </Midl>
   </ItemGroup>
