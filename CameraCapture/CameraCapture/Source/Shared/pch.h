@@ -37,7 +37,7 @@ struct CustomBuffer : winrt::implements<CustomBuffer, winrt::Windows::Storage::S
 
     uint32_t Capacity() const
     {
-        return m_buffer.size();
+        return static_cast<uint32_t>(m_buffer.size());
     }
 
     uint32_t Length() const
