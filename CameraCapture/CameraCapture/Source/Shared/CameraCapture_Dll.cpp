@@ -68,7 +68,7 @@ HRESULT TrackModule(winrt::Module &module, INSTANCE_HANDLE * handleId)
 // UnitySetInterfaces
 static void UNITY_INTERFACE_API OnGraphicsDeviceEvent(UnityGfxDeviceEventType eventType);
 
-extern "C" void    UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
+extern "C" void UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API UnityPluginLoad(IUnityInterfaces* unityInterfaces)
 {
     s_lastPluginHandleIndex = INSTANCE_HANDLE_START;
     s_instances.clear();

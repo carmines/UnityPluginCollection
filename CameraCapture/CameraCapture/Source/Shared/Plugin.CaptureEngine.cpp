@@ -13,7 +13,7 @@
 #include <mferror.h>
 #include <mfmediacapture.h>
 
-#include <winrt/Windows.Media.Devices.h>
+#include <winrt/windows.media.devices.h>
 #include <pplawait.h>
 
 using namespace winrt;
@@ -86,7 +86,7 @@ void CaptureEngine::Shutdown()
     {
         concurrency::create_task([this, strong]()
             {
-                WaitForSingleObject(m_startPreviewEventHandle.get(), INFINITE);
+                WaitForSingleObject(m_startPreviewEventHandle.get(), 15000);
             }).get();
     }
 
@@ -94,7 +94,7 @@ void CaptureEngine::Shutdown()
     {
         concurrency::create_task([this, strong]()
             {
-                WaitForSingleObject(m_takePhotoEventHandle.get(), INFINITE);
+                WaitForSingleObject(m_takePhotoEventHandle.get(), 15000);
             }).get();
     }
 
@@ -141,13 +141,13 @@ hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
     IFR(CreateDeviceResources());
 
     m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([this, strong](auto&& /*sender*/, auto&& status)
+    m_startPreviewOp.Completed([this, strong](auto const& result, auto const& status)
     {
         m_startPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
-            Failed();
+            Failed(result.ErrorCode());
         }
         else if (status == AsyncStatus::Completed)
         {
@@ -179,13 +179,13 @@ hresult CaptureEngine::StopPreview()
     ResetEvent(m_stopPreviewEventHandle.get());
 
     m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([this, strong](auto&& /*sender*/, auto&& status)
+    m_stopPreviewOp.Completed([this, strong](auto const& result, auto const& status)
     {
         m_stopPreviewOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
-            Failed();
+            Failed(result.ErrorCode());
         }
         else if (status == AsyncStatus::Completed)
         {
@@ -219,13 +219,13 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
     IFR(CreateDeviceResources());
 
     m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc);
-    m_takePhotoOp.Completed([this, strong](auto&& /*result*/, auto&& status)
+    m_takePhotoOp.Completed([this, strong](auto const& result, auto const& status)
     {
         m_takePhotoOp = nullptr;
 
         if (status == AsyncStatus::Error)
         {
-            Failed();
+            Failed(result.ErrorCode());
         }
         else if (status == AsyncStatus::Completed)
         {
@@ -527,7 +527,15 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 
     // set video controller properties
     auto videoController = m_mediaCapture.VideoDeviceController();
-    videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
+
+    try
+    {
+        videoController.DesiredOptimization(Windows::Media::Devices::MediaCaptureOptimization::LatencyThenQuality);
+    }
+    catch (hresult_error const& er)
+    {
+        Log(L"DesiredOptimization failed: 0x%lx", er.code());
+    }
 
     // override video controller media stream properties
     if (m_initSettings.SharingMode() == MediaCaptureSharingMode::ExclusiveControl)
@@ -692,7 +700,7 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
         }
         catch (hresult_error const& error)
         {
-            Log(L"can't add the mrc extension - %s", error.message().c_str());
+            Log(L"can't add the mrc extension - %s\n", error.message().c_str());
         }
 
         addedEffect = true;

@@ -63,7 +63,7 @@ hresult Module::Callback(
 }
 
 _Use_decl_annotations_
-hresult Module::Failed()
+hresult Module::Failed(hresult hr)
 {
     CALLBACK_STATE state{};
     ZeroMemory(&state, sizeof(CALLBACK_STATE));
@@ -71,7 +71,7 @@ hresult Module::Failed()
     state.type = CallbackType::Failed;
 
     ZeroMemory(&state.value.failedState, sizeof(FAILED_STATE));
-    state.value.failedState.hresult = E_UNEXPECTED;
+    state.value.failedState.hresult = hr;
 
     auto gurad = m_cs.Guard();
 

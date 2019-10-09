@@ -10,7 +10,7 @@ struct __declspec(uuid("34fe2ecf-68d3-4732-a05a-2a737b63c386")) IModulePriv : ::
 {
     virtual winrt::hresult __stdcall Initialize(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback, _In_ void* pCallbackObject) = 0;
     virtual winrt::hresult __stdcall Callback(_In_ CALLBACK_STATE state) = 0;
-    virtual winrt::hresult __stdcall Failed() = 0;
+    virtual winrt::hresult __stdcall Failed(winrt::hresult hr) = 0;
 };
 
 namespace winrt::CameraCapture::Plugin::implementation
@@ -25,7 +25,7 @@ namespace winrt::CameraCapture::Plugin::implementation
         // IModulePriv
         virtual hresult __stdcall Initialize(_In_ std::weak_ptr<IUnityDeviceResource> const& unityDevice, _In_ StateChangedCallback stateCallback, _In_ void* pCallbackObject) override;
         virtual hresult __stdcall Callback(_In_ CALLBACK_STATE state) override;
-        virtual hresult __stdcall Failed() override;
+        virtual hresult __stdcall Failed(winrt::hresult hr) override;
 
     protected:
         std::weak_ptr<IUnityDeviceResource> m_deviceResources;
