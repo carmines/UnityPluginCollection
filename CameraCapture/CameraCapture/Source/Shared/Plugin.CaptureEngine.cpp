@@ -107,7 +107,7 @@ void CaptureEngine::Shutdown()
     {
         concurrency::create_task([this, strong]()
             {
-                WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
+                WaitForSingleObject(m_stopPreviewEventHandle.get(), 15000);
             }).get();
     }
 
@@ -129,19 +129,40 @@ void CaptureEngine::Shutdown()
 
 hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc)
 {
-    auto strong = get_strong();
-
     if (m_startPreviewOp != nullptr)
     {
         IFR(E_ABORT);
+    }
+
+    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
+            }).get();
+    }
+
+    if (m_takePhotoOp != nullptr && m_takePhotoOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_takePhotoEventHandle.get(), INFINITE);
+            }).get();
     }
 
     ResetEvent(m_startPreviewEventHandle.get());
 
     IFR(CreateDeviceResources());
 
+    if (m_sharedVideoTexture != nullptr)
+    {
+        m_sharedVideoTexture->Reset();
+
+        m_sharedVideoTexture = nullptr;
+    }
+
     m_startPreviewOp = StartPreviewCoroutine(width, height, enableAudio, enableMrc);
-    m_startPreviewOp.Completed([this, strong](auto const& result, auto const& status)
+    m_startPreviewOp.Completed([this, strong= get_strong()](auto const& result, auto const& status)
     {
         m_startPreviewOp = nullptr;
 
@@ -169,17 +190,31 @@ hresult CaptureEngine::StartPreview(uint32_t width, uint32_t height, bool enable
 
 hresult CaptureEngine::StopPreview()
 {
-    auto strong = get_strong();
-
     if (m_stopPreviewOp != nullptr)
     {
         IFR(E_ABORT);
     }
 
+    if (m_startPreviewOp != nullptr && m_startPreviewOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_startPreviewEventHandle.get(), INFINITE);
+            }).get();
+    }
+
+    if (m_takePhotoOp != nullptr && m_takePhotoOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_takePhotoEventHandle.get(), INFINITE);
+            }).get();
+    }
+
     ResetEvent(m_stopPreviewEventHandle.get());
 
     m_stopPreviewOp = StopPreviewCoroutine();
-    m_stopPreviewOp.Completed([this, strong](auto const& result, auto const& status)
+    m_stopPreviewOp.Completed([this, strong = get_strong()](auto const& result, auto const& status)
     {
         m_stopPreviewOp = nullptr;
 
@@ -207,11 +242,25 @@ hresult CaptureEngine::StopPreview()
 
 hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc)
 {
-    auto strong = get_strong();
-
     if (m_takePhotoOp)
     {
         IFR(E_ABORT);
+    }
+
+    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
+            }).get();
+    }
+
+    if (m_stopPreviewOp != nullptr && m_stopPreviewOp.Status() == AsyncStatus::Started)
+    {
+        concurrency::create_task([this]()
+            {
+                WaitForSingleObject(m_stopPreviewEventHandle.get(), INFINITE);
+            }).get();
     }
 
     ResetEvent(m_takePhotoEventHandle.get());
@@ -219,7 +268,7 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
     IFR(CreateDeviceResources());
 
     m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc);
-    m_takePhotoOp.Completed([this, strong](auto const& result, auto const& status)
+    m_takePhotoOp.Completed([this, strong = get_strong()](auto const& result, auto const& status)
     {
         m_takePhotoOp = nullptr;
 
@@ -268,6 +317,8 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
 
 CameraCapture::Media::PayloadHandler CaptureEngine::PayloadHandler()
 {
+    auto guard = m_cs.Guard();
+
     return m_payloadHandler;
 }
 void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& value)
@@ -283,6 +334,8 @@ void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& v
 
     m_payloadEventRevoker = m_payloadHandler.OnStreamPayload(winrt::auto_revoke, [this, strong](auto const sender, Media::Payload const& payload)
         {
+            auto guard = m_cs.Guard();
+
             if (m_isShutdown)
             {
                 return;
@@ -412,15 +465,21 @@ void CaptureEngine::PayloadHandler(CameraCapture::Media::PayloadHandler const& v
 
 CameraCapture::Media::Capture::Sink CaptureEngine::MediaSink()
 {
+    auto guard = m_cs.Guard();
+
     return m_mediaSink;
 }
 
 Windows::Perception::Spatial::SpatialCoordinateSystem CaptureEngine::AppCoordinateSystem()
 {
+    auto guard = m_cs.Guard();
+
     return m_appCoordinateSystem;
 }
 void CaptureEngine::AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value)
 {
+    auto guard = m_cs.Guard();
+
     m_appCoordinateSystem = value;
 }
 
@@ -510,11 +569,11 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
     uint32_t width, uint32_t height,
     boolean enableAudio, boolean enableMrc)
 {
-    auto strong = get_strong();
-
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
+
+    auto guard = m_cs.Guard();
 
     if (m_mediaCapture == nullptr)
     {
@@ -624,11 +683,11 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 
 IAsyncAction CaptureEngine::StopPreviewCoroutine()
 {
-    auto strong = get_strong();
-
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
+
+    auto guard = m_cs.Guard();
 
     m_payloadEventRevoker.revoke();
 
@@ -639,24 +698,51 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
         m_mediaSink.PayloadHandler(nullptr);
     }
 
+    hresult hr = S_OK;
+
     if (m_mediaCapture != nullptr)
     {
-        if (m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming)
+        try
         {
-            if (m_streamType == MediaStreamType::VideoRecord)
+            if (m_mediaCapture.CameraStreamState() == Windows::Media::Devices::CameraStreamState::Streaming)
             {
-                co_await m_mediaCapture.StopRecordAsync();
+                if (m_streamType == MediaStreamType::VideoRecord)
+                {
+                    co_await m_mediaCapture.StopRecordAsync();
+                }
+                else if (m_streamType == MediaStreamType::VideoPreview)
+                {
+                    co_await m_mediaCapture.StopPreviewAsync();
+                }
             }
-            else if (m_streamType == MediaStreamType::VideoPreview)
-            {
-                co_await m_mediaCapture.StopPreviewAsync();
-            }
+        }
+        catch (hresult_error er)
+        {
+            Log(L"StopPreviewAsync failed: %s", er.message().c_str());
+
+            hr = er.code();
         }
 
         co_await ReleaseMediaCaptureAsync();
+
+        if (m_mediaSink != nullptr)
+        {
+            auto mfSink = m_mediaSink.try_as<IMFMediaSink>();
+            if (mfSink != nullptr)
+            {
+                mfSink->Shutdown();
+            }
+
+            m_mediaSink = nullptr;
+        }
     }
 
     SetEvent(m_stopPreviewEventHandle.get());
+
+    if (FAILED(hr))
+    {
+        throw_hresult(hr);
+    }
 
     co_await calling_thread;
 }
@@ -666,11 +752,11 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
     uint32_t const height,
     boolean const enableMrc)
 {
-    auto strong = get_strong();
-
     winrt::apartment_context calling_thread;
 
     co_await resume_background();
+
+    auto guard = m_cs.Guard();
 
     auto createdCapture = false;
     if (m_mediaCapture == nullptr)

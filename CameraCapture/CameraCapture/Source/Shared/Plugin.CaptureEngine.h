@@ -58,6 +58,8 @@ namespace winrt::CameraCapture::Plugin::implementation
         hresult CreatePhotoTexture(uint32_t width, uint32_t height);
 
     private:
+        CriticalSection m_cs;
+
         std::atomic<boolean> m_isShutdown;
         winrt::handle m_startPreviewEventHandle;
         winrt::handle m_stopPreviewEventHandle;

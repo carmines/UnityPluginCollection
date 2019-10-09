@@ -256,7 +256,10 @@ namespace CameraCapture
 
         public async void StopPreview()
         {
-            await StopPreviewAsync();
+            if (!await StopPreviewAsync())
+            {
+                StopPreview();
+            }
         }
 
         public async void TakePhoto()
