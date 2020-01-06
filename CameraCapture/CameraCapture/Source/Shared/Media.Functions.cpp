@@ -387,7 +387,7 @@ inline winrt::Windows::Foundation::IInspectable ConvertProperty(PROPVARIANT cons
         break;
     case VT_UI4:
     case VT_UINT:
-        return PropertyValue::CreateInt32(var.lVal);
+        return PropertyValue::CreateUInt32(var.lVal);
         break;
     case VT_I8:
         return PropertyValue::CreateInt64(var.hVal.QuadPart);

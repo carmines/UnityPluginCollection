@@ -37,5 +37,5 @@ CameraCapture::Media::Capture::AudioMixerMode MrcAudioEffect::MixerMode()
 
 void MrcAudioEffect::MixerMode(CameraCapture::Media::Capture::AudioMixerMode const& value)
 {
-    m_propertySet.Insert(PROPERTY_MIXERMODE, box_value<CameraCapture::Media::Capture::AudioMixerMode, uint32_t>(value));
+    m_propertySet.Insert(PROPERTY_MIXERMODE, box_value<CameraCapture::Media::Capture::AudioMixerMode>(value));
 }

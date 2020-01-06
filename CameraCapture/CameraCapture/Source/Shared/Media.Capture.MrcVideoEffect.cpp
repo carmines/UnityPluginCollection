@@ -81,14 +81,14 @@ MediaStreamType MrcVideoEffect::StreamType()
     MediaStreamType result = DefaultStreamType;
     if (m_propertySet.HasKey(PROPERTY_STREAMTYPE))
     {
-        result = unbox_value<MediaStreamType>((m_propertySet.Lookup(PROPERTY_STREAMTYPE)));
+        result = unbox_value<MediaStreamType>(m_propertySet.Lookup(PROPERTY_STREAMTYPE));
     }
 
     return result;
 }
 void MrcVideoEffect::StreamType(MediaStreamType const& value)
 {
-    m_propertySet.Insert(PROPERTY_STREAMTYPE, box_value<MediaStreamType, uint32_t>(value));
+    m_propertySet.Insert(PROPERTY_STREAMTYPE, box_value<MediaStreamType>(value));
 }
 
 bool MrcVideoEffect::VideoStabilizationEnabled()
