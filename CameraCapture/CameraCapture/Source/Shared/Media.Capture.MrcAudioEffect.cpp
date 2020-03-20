@@ -9,7 +9,7 @@ using namespace winrt;
 using namespace CameraCapture::Media::Capture::implementation;
 
 MrcAudioEffect::MrcAudioEffect()
-    : m_propertySet() 
+    : m_propertySet(Windows::Foundation::Collections::PropertySet{})
 {
     MixerMode(DefaultAudioMixerMode);
 }

@@ -58,7 +58,6 @@ CaptureEngine::CaptureEngine()
     , m_initSettings(nullptr)
     , m_mrcAudioEffect(nullptr)
     , m_mrcVideoEffect(nullptr)
-    , m_mrcPreviewEffect(nullptr)
     , m_mediaSink(nullptr)
     , m_payloadHandler(nullptr)
     , m_audioSample(nullptr)
@@ -577,6 +576,8 @@ IAsyncAction CaptureEngine::StartPreviewCoroutine(
 
     if (m_mediaCapture == nullptr)
     {
+        m_sharingMode = enableMrc ? MediaCaptureSharingMode::ExclusiveControl : MediaCaptureSharingMode::SharedReadOnly;
+
         co_await CreateMediaCaptureAsync(width, height, enableAudio);
     }
     else
@@ -747,6 +748,7 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
     co_await calling_thread;
 }
 
+
 IAsyncAction CaptureEngine::TakePhotoCoroutine(
     uint32_t const width,
     uint32_t const height,
@@ -761,6 +763,8 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
     auto createdCapture = false;
     if (m_mediaCapture == nullptr)
     {
+        m_sharingMode = enableMrc ? MediaCaptureSharingMode::ExclusiveControl : MediaCaptureSharingMode::SharedReadOnly;
+
         co_await CreateMediaCaptureAsync(width, height, false);
 
         createdCapture = true;
@@ -768,18 +772,14 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
 
     auto captureSettings = m_mediaCapture.MediaCaptureSettings();
 
-    auto characteristic = captureSettings.VideoDeviceCharacteristic();
-
     auto addedEffect = false;
     if (enableMrc 
-        &&
-        characteristic != VideoDeviceCharacteristic::AllStreamsIndependent 
-        &&
-        characteristic != VideoDeviceCharacteristic::PreviewPhotoStreamsIdentical)
+        && 
+        m_sharingMode == MediaCaptureSharingMode::ExclusiveControl)
     {
         try
         {
-            auto mrcVideoEffect = Media::Capture::MrcVideoEffect();
+            Media::Capture::MrcVideoEffect mrcVideoEffect{};
             mrcVideoEffect.StreamType(MediaStreamType::Photo);
 
             co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::Photo);
@@ -832,7 +832,7 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
         IFT(spService->GetService(MF_WRAPPED_SAMPLE_SERVICE, __uuidof(IMFSample), spSample.put_void()));
 
         // copy the data
-        IFV(CopySample(MFMediaType_Video, spSample, m_photoSample));
+        IFT(CopySample(MFMediaType_Video, spSample, m_photoSample));
     }
 
     co_await photoCapture.FinishAsync();
@@ -874,7 +874,8 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     auto videoDevice = co_await GetFirstDeviceAsync(Windows::Devices::Enumeration::DeviceClass::VideoCapture);
 
     // initialize settings
-    auto initSettings = MediaCaptureInitializationSettings();
+    auto initSettings = MediaCaptureInitializationSettings{};
+    initSettings.SharingMode(m_sharingMode);
     initSettings.MemoryPreference(MediaCaptureMemoryPreference::Auto);
     initSettings.StreamingCaptureMode(enableAudio ? StreamingCaptureMode::AudioAndVideo : StreamingCaptureMode::Video);
     initSettings.MediaCategory(m_category);
@@ -901,7 +902,6 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
     // if profiles are supported
     if (MediaCapture::IsVideoProfileSupported(videoDevice.Id()))
     {
-        initSettings.SharingMode(MediaCaptureSharingMode::SharedReadOnly);
 
         setlocale(LC_ALL, "");
 
@@ -968,16 +968,14 @@ IAsyncAction CaptureEngine::CreateMediaCaptureAsync(
         }
         initSettings.PhotoMediaDescription(videoProfileMediaDescription);
     }
-    else
-    {
-        initSettings.SharingMode(MediaCaptureSharingMode::ExclusiveControl);
-    }
 
     auto mediaCapture = Windows::Media::Capture::MediaCapture();
     co_await mediaCapture.InitializeAsync(initSettings);
 
     m_mediaCapture = mediaCapture;
     m_initSettings = initSettings;
+
+    co_return;
 }
 
 IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
@@ -999,6 +997,8 @@ IAsyncAction CaptureEngine::ReleaseMediaCaptureAsync()
     m_mediaCapture.Close();
 
     m_mediaCapture = nullptr;
+
+    co_return;
 }
 
 
@@ -1010,31 +1010,16 @@ IAsyncAction CaptureEngine::AddMrcEffectsAsync(
         co_return;
     }
 
-    auto captureSettings = m_mediaCapture.MediaCaptureSettings();
-
     try
     {
-        auto mrcVideoEffect = Media::Capture::MrcVideoEffect();
+        auto mrcVideoEffect = Media::Capture::MrcVideoEffect{};
 
-        if (captureSettings.VideoDeviceCharacteristic() == VideoDeviceCharacteristic::AllStreamsIdentical ||
-            captureSettings.VideoDeviceCharacteristic() == VideoDeviceCharacteristic::PreviewRecordStreamsIdentical)
-        {
-            mrcVideoEffect.StreamType(MediaStreamType::VideoRecord);
-            m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoRecord);
-        }
-        else
-        {
-            mrcVideoEffect.StreamType(MediaStreamType::VideoPreview);
-            m_mrcPreviewEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoPreview);
-
-            mrcVideoEffect.StreamType(MediaStreamType::VideoRecord);
-            m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, MediaStreamType::VideoRecord);
-        }
+        mrcVideoEffect.StreamType(m_streamType);
+        m_mrcVideoEffect = co_await m_mediaCapture.AddVideoEffectAsync(mrcVideoEffect, m_streamType);
 
         if (enableAudio)
         {
-            auto mrcAudioEffect = make<MrcAudioEffect>().as<IAudioEffectDefinition>();
-
+            auto mrcAudioEffect = Media::Capture::MrcAudioEffect{};
             m_mrcAudioEffect = co_await m_mediaCapture.AddAudioEffectAsync(mrcAudioEffect);
         }
     }
@@ -1053,31 +1038,21 @@ IAsyncAction CaptureEngine::RemoveMrcEffectsAsync()
         co_return;
     }
 
-    if (m_mrcAudioEffect != nullptr || m_mrcPreviewEffect != nullptr || m_mrcVideoEffect != nullptr)
+    if (m_mrcAudioEffect != nullptr)
     {
-        if (m_mrcAudioEffect != nullptr)
-        {
-            co_await m_mediaCapture.RemoveEffectAsync(m_mrcAudioEffect);
-            m_mrcAudioEffect = nullptr;
-        }
-
-        if (m_mrcPreviewEffect != nullptr)
-        {
-            co_await m_mediaCapture.RemoveEffectAsync(m_mrcPreviewEffect);
-            m_mrcPreviewEffect = nullptr;
-        }
-
-        if (m_mrcVideoEffect != nullptr)
-        {
-            co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
-            m_mrcVideoEffect = nullptr;
-        }
+        co_await m_mediaCapture.RemoveEffectAsync(m_mrcAudioEffect);
+        m_mrcAudioEffect = nullptr;
     }
-    else
+
+    if (m_mrcVideoEffect != nullptr)
     {
-        co_return;
+        co_await m_mediaCapture.RemoveEffectAsync(m_mrcVideoEffect);
+        m_mrcVideoEffect = nullptr;
     }
+
+    co_return;
 }
+
 
 hresult CaptureEngine::CreatePhotoTexture(uint32_t width, uint32_t height)
 {

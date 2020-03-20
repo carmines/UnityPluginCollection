@@ -10,7 +10,7 @@ using namespace CameraCapture::Media::Capture::implementation;
 using namespace Windows::Media::Capture;
 
 MrcVideoEffect::MrcVideoEffect()
-    : m_propertySet()
+    : m_propertySet(Windows::Foundation::Collections::PropertySet{})
 {
     // Set Default values
     StreamType(DefaultStreamType);
@@ -36,7 +36,7 @@ float MrcVideoEffect::GlobalOpacityCoefficient()
     float result = DefaultGlobalOpacityCoefficient;
     if (m_propertySet.HasKey(PROPERTY_GLOBALOPACITYCOEFFICIENT))
     {
-        result = unbox_value<float>((m_propertySet.Lookup(PROPERTY_GLOBALOPACITYCOEFFICIENT)));
+        result = unbox_value<float>(m_propertySet.Lookup(PROPERTY_GLOBALOPACITYCOEFFICIENT));
     }
 
     return result;
@@ -51,7 +51,7 @@ bool MrcVideoEffect::HologramCompositionEnabled()
     bool result = DefaultHologramCompositionEnabled;
     if (m_propertySet.HasKey(PROPERTY_HOLOGRAMCOMPOSITIONENABLED))
     {
-        result = unbox_value<bool>((m_propertySet.Lookup(PROPERTY_HOLOGRAMCOMPOSITIONENABLED)));
+        result = unbox_value<bool>(m_propertySet.Lookup(PROPERTY_HOLOGRAMCOMPOSITIONENABLED));
     }
 
     return result;

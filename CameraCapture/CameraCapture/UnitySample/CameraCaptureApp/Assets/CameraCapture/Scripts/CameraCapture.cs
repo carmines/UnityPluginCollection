@@ -222,6 +222,8 @@ namespace CameraCapture
 
             if (sizeChanged)
             {
+                Debug.Log($"Size Changed = {state.width} x {state.height}");
+
                 Width = state.width;
                 Height = state.height;
             }

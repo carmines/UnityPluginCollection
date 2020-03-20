@@ -83,7 +83,6 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Media::IMediaExtension m_mrcAudioEffect;
         Windows::Media::IMediaExtension m_mrcVideoEffect;
-        Windows::Media::IMediaExtension m_mrcPreviewEffect;
 
         // IMFMediaSink
         Media::Capture::Sink m_mediaSink;

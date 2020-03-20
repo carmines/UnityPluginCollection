@@ -4,18 +4,17 @@
 #pragma once
 
 #include "Media.Capture.MrcVideoEffect.g.h"
-#include <winrt/Windows.Foundation.Collections.h>
 
 namespace winrt::CameraCapture::Media::Capture::implementation
 {
 
-#define  PROPERTY_GLOBALOPACITYCOEFFICIENT L"GlobalOpacityCoefficient"
-#define  PROPERTY_HOLOGRAMCOMPOSITIONENABLED L"HologramCompositionEnabled"
-#define  PROPERTY_RECORDINGINDICATORENABLED L"RecordingIndicatorEnabled"
-#define  PROPERTY_STREAMTYPE L"StreamType"
-#define  PROPERTY_VIDEOSTABILIZATIONENABLED L"VideoStabilizationEnabled"
-#define  PROPERTY_VIDEOSTABILIZATIONBUFFERLENGTH L"VideoStabilizationBufferLength"
-#define  PROPERTY_MAX_VSBUFFER 30U
+#define PROPERTY_GLOBALOPACITYCOEFFICIENT L"GlobalOpacityCoefficient"
+#define PROPERTY_HOLOGRAMCOMPOSITIONENABLED L"HologramCompositionEnabled"
+#define PROPERTY_RECORDINGINDICATORENABLED L"RecordingIndicatorEnabled"
+#define PROPERTY_STREAMTYPE L"StreamType"
+#define PROPERTY_VIDEOSTABILIZATIONENABLED L"VideoStabilizationEnabled"
+#define PROPERTY_VIDEOSTABILIZATIONBUFFERLENGTH L"VideoStabilizationBufferLength"
+#define PROPERTY_MAX_VSBUFFER 30U
 
     struct MrcVideoEffect : MrcVideoEffectT<MrcVideoEffect>
     {
