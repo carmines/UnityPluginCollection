@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <shared_mutex>
+#include <locale>
 
 #define WIN32_LEAN_AND_MEAN
 
