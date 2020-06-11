@@ -4,21 +4,13 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{15dc8982-b65a-4544-b864-964f7fcd4aae}</ProjectGuid>
     <RootNamespace>Unity</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommand>C:\Unity\Editors\2019.1.14f1\Editor\Unity.exe</LocalDebuggerCommand>
-    <LocalDebuggerCommandArguments>-projectPath $(ProjectDir)$(SolutionName)App</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(ProjectDir)$(SolutionName)App</LocalDebuggerWorkingDirectory>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommand>C:\Unity\Editors\2019.1.14f1\Editor\Unity.exe</LocalDebuggerCommand>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-projectPath $(ProjectDir)$(SolutionName)App</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(ProjectDir)$(SolutionName)App</LocalDebuggerWorkingDirectory>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup>
+    <LocalDebuggerCommand>C:\Unity\2019.4.0f1\Editor\Unity.exe</LocalDebuggerCommand>
+    <LocalDebuggerCommandArguments>-projectPath $(ProjectDir)$(SolutionName)App</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)$(SolutionName)App</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <OutDir>$(SolutionDir)Build\$(Configuration)\$(ProjectName)\$(PlatformShortName)\</OutDir>
     <IntDir>$(SolutionDir)Temp\$(ProjectName)\$(Configuration)\$(PlatformShortName)\</IntDir>
   </PropertyGroup>
