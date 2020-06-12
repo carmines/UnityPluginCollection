@@ -37,9 +37,6 @@ namespace winrt::CameraCapture::Plugin::implementation
         CameraCapture::Media::PayloadHandler PayloadHandler();
         void PayloadHandler(CameraCapture::Media::PayloadHandler const& value);
 
-        Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
-        void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
-
 
     private:
         hresult CreateDeviceResources();
@@ -83,6 +80,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Media::IMediaExtension m_mrcAudioEffect;
         Windows::Media::IMediaExtension m_mrcVideoEffect;
+        Windows::Media::IMediaExtension m_mrcPreviewEffect;
 
         // IMFMediaSink
         Media::Capture::Sink m_mediaSink;
@@ -98,9 +96,6 @@ namespace winrt::CameraCapture::Plugin::implementation
         com_ptr<ID3D11Texture2D> m_photoTexture;
         com_ptr<ID3D11ShaderResourceView> m_photoTextureSRV;
         com_ptr<IMFSample> m_photoSample;
-        CameraCapture::Media::Transform m_photoTransforms;
-
-        Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };
 }
 

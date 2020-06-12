@@ -17,10 +17,32 @@ using namespace Windows::Media::MediaProperties;
 PayloadHandler::PayloadHandler()
     : m_isShutdown(false)
     , m_workItemQueueId(MFASYNC_CALLBACK_QUEUE_UNDEFINED)
+    , m_transform(CameraCapture::Media::Transform())
+    , m_appCoordinateSystem(nullptr)
 {
     IFT(MFStartup(MF_VERSION));
 
     IFT(MFAllocateSerialWorkQueue(MFASYNC_CALLBACK_QUEUE_MULTITHREADED, &m_workItemQueueId));
+}
+
+Windows::Perception::Spatial::SpatialCoordinateSystem PayloadHandler::AppCoordinateSystem()
+{
+    return m_appCoordinateSystem;
+}
+
+void PayloadHandler::AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value)
+{
+    m_appCoordinateSystem = value;
+}
+
+bool PayloadHandler::ProceesTranform(CameraCapture::Media::Payload const& payload)
+{
+    if (m_appCoordinateSystem != nullptr)
+    {
+        return m_transform.ProcessWorldTransform(payload, m_appCoordinateSystem);
+    }
+
+    return false;
 }
 
 void PayloadHandler::Close()
@@ -54,8 +76,8 @@ void PayloadHandler::QueuePayload(CameraCapture::Media::Payload const& payload)
 
 _Use_decl_annotations_
 HRESULT PayloadHandler::QueueMFSample(
-    GUID majorType, 
-    com_ptr<IMFMediaType> const& type, 
+    GUID majorType,
+    com_ptr<IMFMediaType> const& type,
     com_ptr<IMFSample> const& sample)
 {
     auto payload = make<Media::implementation::Payload>();

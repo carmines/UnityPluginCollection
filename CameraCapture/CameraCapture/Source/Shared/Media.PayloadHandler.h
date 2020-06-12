@@ -9,12 +9,19 @@
 #include <mfidl.h>
 #include <mferror.h>
 
+#include "Media.Transform.h"
+
 namespace winrt::CameraCapture::Media::implementation
 {
     struct PayloadHandler : PayloadHandlerT<PayloadHandler, IMFAsyncCallback>
     {
         PayloadHandler();
         ~PayloadHandler() { Close(); }
+
+        // PayloadHandler
+        bool ProceesTranform(CameraCapture::Media::Payload const& payload);
+        Windows::Perception::Spatial::SpatialCoordinateSystem AppCoordinateSystem();
+        void AppCoordinateSystem(Windows::Perception::Spatial::SpatialCoordinateSystem const& value);
 
         // IClosable
         void Close();
@@ -25,7 +32,6 @@ namespace winrt::CameraCapture::Media::implementation
         void QueueEncodingProperties(Windows::Media::MediaProperties::IMediaEncodingProperties const& mediaDescription);
         void QueuePayload(CameraCapture::Media::Payload const& payload);
 
-        // PayloadHandler
         winrt::event_token OnMediaProfile(Windows::Foundation::EventHandler<Windows::Media::MediaProperties::MediaEncodingProfile> const& handler)
         {
             return m_profileEvent.add(handler);
@@ -71,7 +77,7 @@ namespace winrt::CameraCapture::Media::implementation
             m_mediaDescriptionEvent.remove(token);
         }
 
-        // IMFAsyncCallback
+        // internal
         STDMETHODIMP QueueMFSample(
             _In_ GUID majorType,
             _In_ com_ptr<IMFMediaType> const& type,
@@ -80,12 +86,12 @@ namespace winrt::CameraCapture::Media::implementation
         STDMETHODIMP QueueUnknown(
             _In_ ::IUnknown* pUnknown);
 
+        // IMFAsyncCallback
         STDOVERRIDEMETHODIMP GetParameters(
             __RPC__out DWORD *pdwFlags,
             __RPC__out DWORD *pdwQueue);
         STDOVERRIDEMETHODIMP Invoke(
             __RPC__in_opt IMFAsyncResult *pAsyncResult);
-
 
     private:
         CriticalSection m_cs;
@@ -97,6 +103,9 @@ namespace winrt::CameraCapture::Media::implementation
         event<Windows::Foundation::EventHandler<Windows::Media::Core::MediaStreamSample>> m_streamSampleEvent;
         event<Windows::Foundation::EventHandler<Windows::Media::MediaProperties::MediaPropertySet>> m_metaDataEvent;
         event<Windows::Foundation::EventHandler<Windows::Media::MediaProperties::IMediaEncodingProperties>> m_mediaDescriptionEvent;
+
+        CameraCapture::Media::Transform m_transform;
+        Windows::Perception::Spatial::SpatialCoordinateSystem m_appCoordinateSystem;
     };
 }
 

@@ -7,7 +7,6 @@
 #include <mfapi.h>
 #include <winrt/windows.foundation.numerics.h>
 #include <winrt/windows.graphics.directx.direct3d11.h>
-#include "Media.Transform.h"
 
 struct SharedTexture : winrt::implements<SharedTexture, winrt::Windows::Foundation::IInspectable>
 {
@@ -23,9 +22,6 @@ struct SharedTexture : winrt::implements<SharedTexture, winrt::Windows::Foundati
 
     void Reset();
 
-    winrt::hresult UpdateTransforms(
-        _In_ winrt::Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem);
-
 public:
     CD3D11_TEXTURE2D_DESC frameTextureDesc;
     winrt::com_ptr<ID3D11Texture2D> frameTexture;
@@ -35,6 +31,4 @@ public:
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DSurface mediaSurface;
     winrt::com_ptr<IMFMediaBuffer> mediaBuffer;
     winrt::com_ptr<IMFSample> mediaSample;
-
-    winrt::CameraCapture::Media::Transform transforms;
 };

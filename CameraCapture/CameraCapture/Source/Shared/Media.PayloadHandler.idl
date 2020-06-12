@@ -14,6 +14,10 @@ namespace CameraCapture.Media
     {
         PayloadHandler();
 
+        Boolean ProceesTranform(CameraCapture.Media.Payload payload);
+
+        Windows.Perception.Spatial.SpatialCoordinateSystem AppCoordinateSystem{ get; set; };
+
         event Windows.Foundation.EventHandler<Windows.Media.MediaProperties.MediaEncodingProfile> OnMediaProfile;
         event Windows.Foundation.EventHandler<Payload> OnStreamPayload;
         event Windows.Foundation.EventHandler<Windows.Media.Core.MediaStreamSample> OnStreamSample;

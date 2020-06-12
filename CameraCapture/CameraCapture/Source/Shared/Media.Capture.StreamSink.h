@@ -80,14 +80,12 @@ namespace winrt::CameraCapture::Media::Capture::implementation
         HRESULT Stop();
         HRESULT Shutdown();
 
-        Capture::State State() { return m_currentState; }
+        Capture::State State() { auto guard = m_cs.Guard(); return m_currentState; }
         void State(Capture::State const& value) { m_currentState = value; }
 
     private:
         STDMETHODIMP CheckShutdown()
         {
-            auto guard = m_cs.Guard();
-
             if (m_currentState == State::Shutdown)
             {
                 return MF_E_SHUTDOWN;

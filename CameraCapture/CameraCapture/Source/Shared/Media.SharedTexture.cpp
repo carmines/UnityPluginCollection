@@ -128,7 +128,6 @@ SharedTexture::SharedTexture()
     , mediaSurface(nullptr)
     , mediaBuffer(nullptr)
     , mediaSample(nullptr)
-    , transforms(nullptr)
 {}
 
 SharedTexture::~SharedTexture()
@@ -155,25 +154,5 @@ void SharedTexture::Reset()
     frameTexture = nullptr;
 
     ZeroMemory(&frameTextureDesc, sizeof(CD3D11_TEXTURE2D_DESC));
-
-    if (transforms != nullptr)
-    {
-        transforms.Reset();
-
-        transforms = nullptr;
-    }
-}
-
-winrt::hresult SharedTexture::UpdateTransforms(
-    SpatialCoordinateSystem const& appCoordinateSystem)
-{
-    NULL_CHK_HR(appCoordinateSystem, E_INVALIDARG);
-
-    if (transforms == nullptr)
-    {
-        transforms = CameraCapture::Media::implementation::Transform::Create(mediaSample);
-    }
-
-    return transforms.Update(appCoordinateSystem);
 }
 

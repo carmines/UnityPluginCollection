@@ -79,12 +79,18 @@ namespace CameraCapture
             UnityEngine.XR.WSA.WorldManager.OnPositionalLocatorStateChanged += (oldState, newState) =>
             {
                 Debug.Log("WorldManager.OnPositionalLocatorStateChanged: " + newState + ", updating any capture in progress");
-                spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
-                if (instanceId != Wrapper.InvalidHandle)
-                {
-                    CheckHR(Native.SetCoordinateSystem(instanceId, spatialCoordinateSystemPtr));
-                }
+
+                SetSpatialCoordinateSystem();
             };
+        }
+
+        private void SetSpatialCoordinateSystem()
+        {
+            spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
+            if (instanceId != Wrapper.InvalidHandle)
+            {
+                CheckHR(Native.SetCoordinateSystem(instanceId, spatialCoordinateSystemPtr));
+            }
         }
 
         protected override void OnEnable()
@@ -113,10 +119,6 @@ namespace CameraCapture
                 PhotoRenderer.enabled = true;
             }
 
-            spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
-
-            CheckHR(Native.SetCoordinateSystem(instanceId, spatialCoordinateSystemPtr));
-
             keywords.Add("take photo", () =>
             {
                 TakePhoto();
@@ -124,6 +126,8 @@ namespace CameraCapture
 
             keywords.Add("start preview", () =>
             {
+                SetSpatialCoordinateSystem();
+
                 StartPreview();
             });
 

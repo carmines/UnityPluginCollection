@@ -13,11 +13,7 @@ namespace CameraCapture.Media
     runtimeclass Transform
     {
         Transform();
-
-        HRESULT Update(Windows.Perception.Spatial.SpatialCoordinateSystem appCoordinateSystem);
-        void Reset();
-
-        Windows.Foundation.Numerics.Matrix4x4 CameraToWorldTransform{ get; };
-        Windows.Foundation.Numerics.Matrix4x4 CameraProjectionMatrix{ get; };
+        
+        Boolean ProcessWorldTransform(CameraCapture.Media.Payload payload, Windows.Perception.Spatial.SpatialCoordinateSystem worldOrigin);
     };
 }

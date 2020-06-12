@@ -2,6 +2,8 @@
 #include "Media.Transform.h"
 #include "Media.Transform.g.cpp"
 
+#include <Media.Payload.h>
+
 #include <winrt/windows.perception.spatial.preview.h>
 #include <winrt/windows.foundation.metadata.h>
 
@@ -25,126 +27,125 @@ EXTERN_GUID(MFSampleExtension_Spatial_CameraViewTransform, 0x4e251fa4, 0x830f, 0
 EXTERN_GUID(MFSampleExtension_Spatial_CameraProjectionTransform, 0x47f9fcb5, 0x2a02, 0x4f26, 0xa4, 0x77, 0x79, 0x2f, 0xdf, 0x95, 0x88, 0x6a);
 #endif
 
-_Use_decl_annotations_
-CameraCapture::Media::Transform Transform::Create(
-    _In_ com_ptr<IMFSample> sourceSample)
+static inline Windows::Foundation::Numerics::float4x4 GetProjection(MFPinholeCameraIntrinsics const& cameraIntrinsics)
 {
-    auto transform = CameraCapture::Media::Transform();
-    if (SUCCEEDED(transform.as<ITransformPriv>()->Initialize(sourceSample)))
-    {
-        return transform;
-    }
+    // Default camera projection, which has
+    // scale up 2.0f to x and y for (-1, -1) to (1, 1) viewport 
+    // and taking camera affine
+    Windows::Foundation::Numerics::float4x4 const defaultProjection(
+        2.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, -2.0f, 0.0f, 0.0f,
+        -1.0f, 1.0f, 1.0f, 1.0f,
+        0.0f, 0.0f, 0.0f, 0.0f);
 
-    return nullptr;
+    float fx = cameraIntrinsics.IntrinsicModels[0].CameraModel.FocalLength.x / static_cast<float>(cameraIntrinsics.IntrinsicModels[0].Width);
+    float fy = cameraIntrinsics.IntrinsicModels[0].CameraModel.FocalLength.y / static_cast<float>(cameraIntrinsics.IntrinsicModels[0].Height);
+    float px = cameraIntrinsics.IntrinsicModels[0].CameraModel.PrincipalPoint.x / static_cast<float>(cameraIntrinsics.IntrinsicModels[0].Width);
+    float py = cameraIntrinsics.IntrinsicModels[0].CameraModel.PrincipalPoint.y / static_cast<float>(cameraIntrinsics.IntrinsicModels[0].Height);
+
+    Windows::Foundation::Numerics::float4x4 const cameraAffine(
+        fx, 0.0f, 0.0f, 0.0f,
+        0.0f, -fy, 0.0f, 0.0f,
+        -px, -py, -1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+
+    return cameraAffine * defaultProjection;
 }
 
 Transform::Transform()
-    : m_sample(nullptr)
-    , m_useNewApi(
+    : m_useNewApi(
         ApiInformation::IsApiContractPresent(L"Windows.Foundation.UniversalApiContract", 8)
         &&
         ApiInformation::IsMethodPresent(L"Windows.Perception.Spatial.Preview.SpatialGraphInteropPreview", L"CreateLocatorForNode"))
+    , m_currentDynamicNodeId()
 {
+}
+
+// Transform
+bool Transform::ProcessWorldTransform(Media::Payload const& payload, Windows::Perception::Spatial::SpatialCoordinateSystem const& worldOrigin)
+{
+    if (payload == nullptr || worldOrigin == nullptr)
+    {
+        return false;
+    }
+
+    hresult hr = S_OK;
+
+    if (m_useNewApi)
+    {
+        hr = UpdateV2(payload, worldOrigin);
+    }
+    else
+    {
+        hr = Update(payload, worldOrigin);
+    }
+
+    return SUCCEEDED(hr);
 }
 
 // ITransform
 _Use_decl_annotations_
-hresult Transform::Initialize(
-    com_ptr<IMFSample> const& sourceSample)
-{
-    m_sample = sourceSample;
-
-    return S_OK;
-}
-
-_Use_decl_annotations_
 hresult Transform::Update(
-    com_ptr<IMFSample> const& sourceSample,
+    Media::Payload const& payload,
     Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem)
 {
-    m_sample = sourceSample;
-
-    return Update(appCoordinateSystem);
-}
-
-
-// Transform
-float4x4 Transform::CameraToWorldTransform()
-{
-    return m_cameraToWorldTransform;
-}
-
-float4x4 Transform::CameraProjectionMatrix()
-{
-    return m_cameraProjectionMatrix;
-}
-
-void Transform::Reset()
-{
-    m_locator = nullptr;
-    m_frameOfReference = nullptr;
-}
-
-hresult Transform::Update(SpatialCoordinateSystem const& appCoordinateSystem)
-{
-    NULL_CHK_HR(appCoordinateSystem, E_INVALIDARG);
-
-    if (m_sample == nullptr)
+    const auto streamSample = payload.try_as<IStreamSample>();
+    if (streamSample == nullptr || streamSample->Sample() == nullptr)
     {
-        return MF_E_NO_VIDEO_SAMPLE_AVAILABLE;
+        IFR(MF_E_NO_VIDEO_SAMPLE_AVAILABLE);
     }
 
-    if (m_useNewApi)
+    // camera view
+    UINT32 sizeCameraView = 0;
+    Numerics::float4x4 cameraView{};
+    IFR(streamSample->Sample()->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &sizeCameraView));
+
+    // coordinate space
+    SpatialCoordinateSystem cameraCoordinateSystem = nullptr;
+    IFR(streamSample->Sample()->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, winrt::guid_of<SpatialCoordinateSystem>(), winrt::put_abi(cameraCoordinateSystem)));
+
+    // sample projection matrix
+    UINT32 sizeCameraProject = 0;
+    Windows::Foundation::Numerics::float4x4 cameraProjection{};
+    IFR(streamSample->Sample()->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&cameraProjection, sizeof(cameraProjection), &sizeCameraProject));
+
+    auto transformRef = cameraCoordinateSystem.TryGetTransformTo(appCoordinateSystem);
+    NULL_CHK_HR(transformRef, E_POINTER);
+
+    // transform matrix to convert to app world space
+    const auto& cameraToWorld = transformRef.Value();
+
+    // transform to world space
+    Numerics::float4x4 invertedCameraView{};
+    if (Numerics::invert(cameraView, &invertedCameraView))
     {
-        IFR(UpdateV2(appCoordinateSystem));
-    }
-    else
-    {
-        // camera view
-        UINT32 sizeCameraView = 0;
-        Numerics::float4x4 cameraView{};
-        IFR(m_sample->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &sizeCameraView));
+        // overwrite the cameraView with new value
+        invertedCameraView *= cameraToWorld;
 
-        // coordinate space
-        SpatialCoordinateSystem cameraCoordinateSystem = nullptr;
-        IFR(m_sample->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, winrt::guid_of<SpatialCoordinateSystem>(), winrt::put_abi(cameraCoordinateSystem)));
-
-        // sample projection matrix
-        UINT32 sizeCameraProject = 0;
-        IFR(m_sample->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&m_cameraProjectionMatrix, sizeof(m_cameraProjectionMatrix), &sizeCameraProject));
-
-        auto transformRef = cameraCoordinateSystem.TryGetTransformTo(appCoordinateSystem);
-        NULL_CHK_HR(transformRef, E_POINTER);
-
-        // transform matrix to convert to app world space
-        const auto& cameraToWorld = transformRef.Value();
-
-        // transform to world space
-        Numerics::float4x4 invertedCameraView{};
-        if (Numerics::invert(cameraView, &invertedCameraView))
-        {
-            // overwrite the cameraView with new value
-            invertedCameraView *= cameraToWorld;
-        }
-
-        m_cameraToWorldTransform = invertedCameraView;
+        streamSample->SetTransformAndProjection(invertedCameraView, cameraProjection);
     }
 
     return S_OK;
 }
 
-hresult Transform::UpdateV2(SpatialCoordinateSystem const& appCoordinateSystem)
+hresult Transform::UpdateV2(
+    Media::Payload const& payload,
+    SpatialCoordinateSystem const& worldOrigin)
 {
+    const auto streamSample = payload.try_as<IStreamSample>();
+    if (streamSample == nullptr || streamSample->Sample() == nullptr)
+    {
+        IFR(MF_E_INVALIDMEDIATYPE);
+    }
+
+    // get sample properties
     UINT32 sizeCameraIntrinsics = 0;
     MFPinholeCameraIntrinsics cameraIntrinsics;
-    IFR(m_sample->GetBlob(MFSampleExtension_PinholeCameraIntrinsics, (UINT8 *)&cameraIntrinsics, sizeof(cameraIntrinsics), &sizeCameraIntrinsics));
+    IFR(streamSample->Sample()->GetBlob(MFSampleExtension_PinholeCameraIntrinsics, (UINT8*)&cameraIntrinsics, sizeof(cameraIntrinsics), &sizeCameraIntrinsics));
 
     UINT32 sizeCameraExtrinsics = 0;
     MFCameraExtrinsics cameraExtrinsics;
-    IFR(m_sample->GetBlob(MFSampleExtension_CameraExtrinsics, (UINT8 *)&cameraExtrinsics, sizeof(cameraExtrinsics), &sizeCameraExtrinsics));
-
-    UINT64 sampleTimeQpc = 0;
-    IFR(m_sample->GetUINT64(MFSampleExtension_DeviceTimestamp, &sampleTimeQpc));
+    IFR(streamSample->Sample()->GetBlob(MFSampleExtension_CameraExtrinsics, (UINT8*)&cameraExtrinsics, sizeof(cameraExtrinsics), &sizeCameraExtrinsics));
 
     // query sample for calibration and validate
     if ((sizeCameraExtrinsics != sizeof(cameraExtrinsics)) ||
@@ -172,22 +173,39 @@ hresult Transform::UpdateV2(SpatialCoordinateSystem const& appCoordinateSystem)
         = make_float4x4_translation(calibratedTransform.Position.x, calibratedTransform.Position.y, calibratedTransform.Position.z);
     const auto& rotation
         = make_float4x4_from_quaternion(Numerics::quaternion{ calibratedTransform.Orientation.x, calibratedTransform.Orientation.y, calibratedTransform.Orientation.z, calibratedTransform.Orientation.w });
-    const auto& cameraToDynamicNode
+    const auto& cameraToLocator
         = rotation * translation;
 
-    // locate dynamic node with respect to appCoordinateSystem
-    const auto& timestamp = PerceptionTimestampHelper::FromSystemRelativeTargetTime(TimeSpanFromQpcTicks(sampleTimeQpc));
-    const auto& location = m_locator.TryLocateAtTimestamp(timestamp, appCoordinateSystem);
-    NULL_CHK_HR(location, MF_E_NOT_FOUND);
+    // get timestamp
+    UINT64 sampleTimeQpc = 0;
+    IFR(streamSample->Sample()->GetUINT64(MFSampleExtension_DeviceTimestamp, &sampleTimeQpc));
 
-    const auto& dynamicNodeToCoordinateSystem
-        = make_float4x4_from_quaternion(location.Orientation()) * make_float4x4_translation(location.Position());
+    TimeSpan deviceTimestamp{ sampleTimeQpc };
+    auto frameTimestamp = PerceptionTimestampHelper::FromSystemRelativeTargetTime(deviceTimestamp);
 
-    // transform for camera -> app world space
-    m_cameraToWorldTransform = cameraToDynamicNode * dynamicNodeToCoordinateSystem;
+    if (worldOrigin && m_locator && frameTimestamp)
+    {
+        // locate dynamic node with respect to appCoordinateSystem
+        const auto& location = m_locator.TryLocateAtTimestamp(frameTimestamp, worldOrigin);
+        NULL_CHK_HR(location, MF_E_NOT_FOUND);
 
-    // get the projection
-    m_cameraProjectionMatrix = GetProjection(cameraIntrinsics);
+        const auto& dynamicNodeToCoordinateSystem
+            = make_float4x4_from_quaternion(location.Orientation()) * make_float4x4_translation(location.Position());
+
+        // transform matrix from locator to app world space
+        Windows::Foundation::Numerics::float4x4 cameraToWorld 
+            = cameraToLocator * dynamicNodeToCoordinateSystem;
+
+        // generate the older projection matrix
+        streamSample->SetTransformAndProjection(
+            cameraToWorld, GetProjection(cameraIntrinsics));
+    }
 
     return S_OK;
+}
+
+void Transform::Reset()
+{
+    m_locator = nullptr;
+    m_frameOfReference = nullptr;
 }

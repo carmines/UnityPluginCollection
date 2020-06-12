@@ -28,6 +28,9 @@ struct __declspec(uuid("8300b3cc-c919-4c54-b01a-b375b843d3f8")) IStreamSample : 
         _In_ winrt::guid const& majorType,
         _In_ winrt::com_ptr<IMFMediaType> const& mediaType, 
         _In_ winrt::com_ptr<IMFSample> const& sample) = 0;
+    virtual void __stdcall SetTransformAndProjection(
+        _In_ winrt::Windows::Foundation::Numerics::float4x4 const& cameraTranform,
+        _In_ winrt::Windows::Foundation::Numerics::float4x4 const& cameraProjection) = 0;
 };
 
 namespace winrt::CameraCapture::Media::implementation
@@ -40,12 +43,19 @@ namespace winrt::CameraCapture::Media::implementation
         Windows::Media::MediaProperties::IMediaEncodingProperties EncodingProperties();
         Windows::Media::Core::MediaStreamSample MediaStreamSample();
 
+        bool HasTransform() { return m_hasTransform; }
+        Windows::Foundation::Numerics::float4x4 CameraToWorld() { return m_cameraToWorld; }
+        Windows::Foundation::Numerics::float4x4 CameraProjection() { return m_cameraProjection; }
+
         // IStreamSample
-        virtual com_ptr<IMFSample> __stdcall Sample() override;
-        virtual winrt::hresult __stdcall Sample(
-            _In_ winrt::guid const& majorType,
-            _In_ winrt::com_ptr<IMFMediaType> const& mediaType, 
-            _In_ winrt::com_ptr<IMFSample> const& sample) override;
+        virtual winrt::com_ptr<IMFSample> __stdcall Sample() override;
+        virtual hresult __stdcall Sample(
+            _In_ guid const& majorType,
+            _In_ com_ptr<IMFMediaType> const& mediaType, 
+            _In_ com_ptr<IMFSample> const& sample) override;
+        virtual void __stdcall SetTransformAndProjection(
+            _In_ Windows::Foundation::Numerics::float4x4 const& cameraTranform,
+            _In_ Windows::Foundation::Numerics::float4x4 const& cameraProjection) override;
 
     private:
         com_ptr<IMFMediaType> m_mediaType;
@@ -54,6 +64,10 @@ namespace winrt::CameraCapture::Media::implementation
         Windows::Media::MediaProperties::MediaPropertySet m_propertySet;
         Windows::Media::MediaProperties::IMediaEncodingProperties m_encodingProperties;
         Windows::Media::Core::MediaStreamSample m_mediaStreamSample;
+
+        bool m_hasTransform;
+        Windows::Foundation::Numerics::float4x4 m_cameraToWorld;
+        Windows::Foundation::Numerics::float4x4 m_cameraProjection;
     };
 }
 

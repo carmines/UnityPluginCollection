@@ -23,7 +23,11 @@ namespace CameraCapture.Media
     runtimeclass Payload
     {
         Payload();
-        
+
+        Boolean HasTransform{ get; };
+        Windows.Foundation.Numerics.Matrix4x4 CameraToWorld{ get; };
+        Windows.Foundation.Numerics.Matrix4x4 CameraProjection{ get; };
+
         Windows.Media.MediaProperties.MediaPropertySet MediaPropertySet{ get; };
         Windows.Media.MediaProperties.IMediaEncodingProperties EncodingProperties{ get; };
         Windows.Media.Core.MediaStreamSample MediaStreamSample{ get; };

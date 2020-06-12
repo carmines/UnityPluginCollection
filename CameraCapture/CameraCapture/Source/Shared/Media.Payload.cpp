@@ -22,6 +22,9 @@ Payload::Payload()
     , m_propertySet()
     , m_encodingProperties(nullptr)
     , m_mediaStreamSample(nullptr)
+    , m_hasTransform(false)
+    , m_cameraToWorld()
+    , m_cameraProjection()
 {
 }
 
@@ -57,6 +60,8 @@ hresult Payload::Sample(
     com_ptr<IMFMediaType> const& mediaType, 
     com_ptr<IMFSample> const& mediaSample)
 {
+    m_hasTransform = false;
+
     // convert to mediastreamsample
     LONGLONG sampleTime = 0;
     IFR(mediaSample->GetSampleTime(&sampleTime));
@@ -73,4 +78,14 @@ hresult Payload::Sample(
     m_mediaStreamSample = streamSample;
 
     return S_OK;
+}
+
+_Use_decl_annotations_
+void Payload::SetTransformAndProjection(
+    _In_ Windows::Foundation::Numerics::float4x4 const& cameraToWorld,
+    _In_ Windows::Foundation::Numerics::float4x4 const& cameraProjection)
+{
+    m_hasTransform = true;
+    m_cameraToWorld = cameraToWorld;
+    m_cameraProjection = cameraProjection;
 }

@@ -47,6 +47,7 @@ static std::shared_ptr<IUnityDeviceResource> s_deviceResource;
 static UnityGfxRenderer s_deviceType = kUnityGfxRendererNull;
 static IUnityInterfaces* s_unityInterfaces = nullptr;
 static IUnityGraphics* s_unityGraphics = nullptr;
+static winrt::CameraCapture::Media::PayloadHandler s_payloadHandler = nullptr;
 
 HRESULT TrackModule(winrt::Module &module, INSTANCE_HANDLE * handleId)
 {
@@ -200,7 +201,12 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureStartPrevie
         hr = capture.StartPreview(width, height, enableAudio, enableMrc);
         if (SUCCEEDED(hr))
         {
-            capture.PayloadHandler(winrt::CameraCapture::Media::PayloadHandler());
+            if (s_payloadHandler == nullptr)
+            {
+                s_payloadHandler = winrt::CameraCapture::Media::PayloadHandler();
+            }
+
+            capture.PayloadHandler(s_payloadHandler);
         }
     }
 
@@ -244,7 +250,7 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureTakePhoto(
 
 extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureSetCoordinateSystem(
     _In_ INSTANCE_HANDLE id,
-    _In_ IUnknown* appCoodinateSystem)
+    _In_ IUnknown* worldOrigin)
 {
     winrt::Module module = nullptr;
     winrt::hresult hr = GetModule(id, module);
@@ -254,17 +260,22 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureSetCoordina
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
         winrt::Windows::Perception::Spatial::SpatialCoordinateSystem coordinateSystem = nullptr;
-        if (appCoodinateSystem != nullptr)
+        if (worldOrigin != nullptr)
         {
             winrt::com_ptr<winrt::Windows::Foundation::IInspectable> spInspectable = nullptr;
-            hr = appCoodinateSystem->QueryInterface(winrt::guid_of<winrt::Windows::Perception::Spatial::SpatialCoordinateSystem>(), spInspectable.put_void());
+            hr = worldOrigin->QueryInterface(winrt::guid_of<winrt::Windows::Perception::Spatial::SpatialCoordinateSystem>(), spInspectable.put_void());
             if (SUCCEEDED(hr))
             {
                 coordinateSystem = spInspectable.as<winrt::Windows::Perception::Spatial::SpatialCoordinateSystem>();
             }
         }
 
-        capture.AppCoordinateSystem(coordinateSystem);
+        if (s_payloadHandler == nullptr)
+        {
+            s_payloadHandler = winrt::CameraCapture::Media::PayloadHandler();
+        }
+
+        s_payloadHandler.AppCoordinateSystem(coordinateSystem);
     }
 
     return hr;

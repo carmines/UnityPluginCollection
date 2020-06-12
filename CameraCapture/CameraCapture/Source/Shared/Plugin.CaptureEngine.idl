@@ -22,6 +22,5 @@ namespace CameraCapture.Plugin
 
         CameraCapture.Media.PayloadHandler PayloadHandler{ get; set; };
         CameraCapture.Media.Capture.Sink MediaSink{ get; };
-        Windows.Perception.Spatial.SpatialCoordinateSystem AppCoordinateSystem{ get; set; };
     };
 }
