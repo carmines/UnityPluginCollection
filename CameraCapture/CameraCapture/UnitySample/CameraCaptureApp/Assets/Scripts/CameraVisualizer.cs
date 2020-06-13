@@ -12,6 +12,12 @@ public class CameraVisualizer : MonoBehaviour
     private Camera cameraCache = null;
     private Vector3 startPosition;
 
+    private Vector3 defaultPosition;
+    private bool alignToCamera = false;
+
+    private const string alignTracker = "align tracker";
+    private const string resetTracker = "reset tracker";
+
     private void Awake()
     {
         cameraCache = Camera.main;
@@ -37,21 +43,24 @@ public class CameraVisualizer : MonoBehaviour
 
     private void OnEnable()
     {
-        startPosition = transform.position;
+        defaultPosition = transform.position;
+        startPosition = cameraCache.transform.localPosition;
     }
 
     private void Update()
     {
         // increase nearplane size
-        float smooth = Time.deltaTime * 10.0f;
+        float smooth = Time.deltaTime * 5.0f;
 
         // update the offset from main camera to pv camera
         if (cameraTracker != null && cameraOffsetRoot != null)
         {
-            Vector3 mainCameraPos = cameraCache.transform.position;
-            Vector3 worldOffset = cameraTracker.transform.position - mainCameraPos;
+            if (alignToCamera)
+            {
+                transform.position = cameraTracker.transform.position;
+            }
 
-            cameraOffsetRoot.position = Vector3.Lerp(cameraOffsetRoot.position, startPosition + worldOffset, smooth);
+            cameraOffsetRoot.localPosition = Vector3.Lerp(cameraOffsetRoot.localPosition, cameraTracker.transform.forward + startPosition, smooth);
         }
 
         // update corner verticies
@@ -69,5 +78,20 @@ public class CameraVisualizer : MonoBehaviour
                 cornerMarkers[i].localPosition = cameraBorder.GetPosition(i);
             }
         }
+    }
+
+    public void PhraseRecognized(string keywords)
+    {
+        var toLower = keywords.ToLower();
+        switch (toLower)
+        {
+            case alignTracker:
+                alignToCamera = true;
+                break;
+            case resetTracker:
+                transform.position = defaultPosition;
+                alignToCamera = false;
+                break;
+        };
     }
 }

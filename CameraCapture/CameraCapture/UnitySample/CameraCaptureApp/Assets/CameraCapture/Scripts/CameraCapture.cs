@@ -33,9 +33,11 @@ namespace CameraCapture
         TaskCompletionSource<Wrapper.CaptureState> stopCompletionSource = null;
         TaskCompletionSource<Wrapper.CaptureState> photoCompletionSource = null;
 
-        private KeywordRecognizer keywordRecognizer;
-        private Dictionary<string, Action> keywords = new Dictionary<string, Action>();
+        private const string takePhoto = "take photo";
+        private const string startPreview = "start preview";
+        private const string stopPreveiw = "stop preview";
 
+#if UNITY_EDITOR
         private void OnGUI()
         {
             int y = 50;
@@ -57,20 +59,27 @@ namespace CameraCapture
             {
                 TakePhoto();
             }
-        }
 
-        private void KeywordRecognizer_OnPhraseRecognized(PhraseRecognizedEventArgs args)
-        {
-            if (args.confidence <= ConfidenceLevel.Medium)
+            y += 55;
+
+            if (GUI.Button(new Rect(50, y, 200, 50), "Test Transform"))
             {
-                System.Action keywordAction;
+                UnityEngine.Matrix4x4 testMatrix = UnityEngine.Matrix4x4.TRS(Vector3.forward + Vector3.up * .25f, new Quaternion(0.3826834f, 0.0f, 0.0f, 0.9238796f), Vector3.one);
+                UnityEngine.Matrix4x4 testProj = UnityEngine.Matrix4x4.Perspective(64.69f, 1.78f, 0.1f, 1.0f);
+                CameraTracker.UpdateCameraMatrices(testMatrix.FromUnity(), testProj.FromUnity());
+            }
 
-                if (keywords.TryGetValue(args.text, out keywordAction))
-                {
-                    keywordAction.Invoke();
-                }
+            if (GUI.Button(new Rect(250, y, 200, 50), "Test Random Transform"))
+            {
+                var position = Vector3.forward * UnityEngine.Random.Range(-2.0f, 2.0f) + Vector3.up * .25f;
+                var angle = Quaternion.AngleAxis(UnityEngine.Random.Range(-90.0f, 90.0f), Vector3.right);
+
+                UnityEngine.Matrix4x4 testMatrix = UnityEngine.Matrix4x4.TRS(position, angle, Vector3.one);
+                UnityEngine.Matrix4x4 testProj = UnityEngine.Matrix4x4.Perspective(64.69f, 1.78f, 0.1f, 1.0f);
+                CameraTracker.UpdateCameraMatrices(testMatrix.FromUnity(), testProj.FromUnity());
             }
         }
+#endif
 
         protected override void Awake()
         {
@@ -82,15 +91,6 @@ namespace CameraCapture
 
                 SetSpatialCoordinateSystem();
             };
-        }
-
-        private void SetSpatialCoordinateSystem()
-        {
-            spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
-            if (instanceId != Wrapper.InvalidHandle)
-            {
-                CheckHR(Native.SetCoordinateSystem(instanceId, spatialCoordinateSystemPtr));
-            }
         }
 
         protected override void OnEnable()
@@ -118,27 +118,6 @@ namespace CameraCapture
             {
                 PhotoRenderer.enabled = true;
             }
-
-            keywords.Add("take photo", () =>
-            {
-                TakePhoto();
-            });
-
-            keywords.Add("start preview", () =>
-            {
-                SetSpatialCoordinateSystem();
-
-                StartPreview();
-            });
-
-            keywords.Add("stop preview", () =>
-            {
-                StopPreview();
-            });
-
-            keywordRecognizer = new KeywordRecognizer(keywords.Keys.ToArray());
-            keywordRecognizer.OnPhraseRecognized += KeywordRecognizer_OnPhraseRecognized;
-            keywordRecognizer.Start();
         }
 
         protected override void OnDisable()
@@ -193,7 +172,18 @@ namespace CameraCapture
             }
         }
 
-        private void OnPreviewFrameChanged(Wrapper.CaptureState state)
+        protected override void OnFailed(Wrapper.FailedState args)
+        {
+            base.OnFailed(args);
+
+            startPreviewCompletionSource?.TrySetCanceled();
+
+            stopCompletionSource?.TrySetCanceled();
+
+            photoCompletionSource?.TrySetCanceled();
+        }
+
+        protected void OnPreviewFrameChanged(Wrapper.CaptureState state)
         {
             var sizeChanged = false;
 
@@ -238,15 +228,31 @@ namespace CameraCapture
             }
         }
 
-        protected override void OnFailed(Wrapper.FailedState args)
+        public void PhraseRecognized(string keywords)
         {
-            base.OnFailed(args);
+            if (keywords.ToLower().Contains(takePhoto))
+            {
+                TakePhoto();
+            }
+            else if (keywords.ToLower().Contains(startPreview))
+            {
+                SetSpatialCoordinateSystem();
 
-            startPreviewCompletionSource?.TrySetCanceled();
+                StartPreview();
+            }
+            else if (keywords.ToLower().Contains(stopPreveiw))
+            {
+                StopPreview();
+            }
+        }
 
-            stopCompletionSource?.TrySetCanceled();
-
-            photoCompletionSource?.TrySetCanceled();
+        private void SetSpatialCoordinateSystem()
+        {
+            spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
+            if (instanceId != Wrapper.InvalidHandle)
+            {
+                CheckHR(Native.SetCoordinateSystem(instanceId, spatialCoordinateSystemPtr));
+            }
         }
 
         private void CreateCapture()
