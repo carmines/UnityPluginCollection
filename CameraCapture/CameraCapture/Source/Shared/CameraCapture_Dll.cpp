@@ -233,16 +233,28 @@ extern "C" int32_t UNITY_INTERFACE_EXPORT UNITY_INTERFACE_API CaptureTakePhoto(
     _In_ INSTANCE_HANDLE id,
     _In_ uint32_t width,
     _In_ uint32_t height,
-    _In_ boolean enableMrc)
+    _In_ boolean enableMrc,
+    _In_ IUnknown * worldOrigin)
 {
     winrt::Module module = nullptr;
     winrt::hresult hr = GetModule(id, module);
     if (SUCCEEDED(hr))
     {
+        winrt::Windows::Perception::Spatial::SpatialCoordinateSystem coordinateSystem = nullptr;
+        if (worldOrigin != nullptr)
+        {
+            winrt::com_ptr<winrt::Windows::Foundation::IInspectable> spInspectable = nullptr;
+            hr = worldOrigin->QueryInterface(winrt::guid_of<winrt::Windows::Perception::Spatial::SpatialCoordinateSystem>(), spInspectable.put_void());
+            if (SUCCEEDED(hr))
+            {
+                coordinateSystem = spInspectable.as<winrt::Windows::Perception::Spatial::SpatialCoordinateSystem>();
+            }
+        }
+
         auto capture = module.as<winrt::CaptureEngine>();
         NULL_CHK_HR(capture, HRESULT_FROM_WIN32(ERROR_INVALID_INDEX));
 
-        hr = capture.TakePhoto(width, height, enableMrc);
+        hr = capture.TakePhoto(width, height, enableMrc, coordinateSystem);
     }
 
     return hr;

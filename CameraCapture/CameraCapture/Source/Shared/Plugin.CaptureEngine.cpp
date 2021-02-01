@@ -6,7 +6,6 @@
 #include "Plugin.CaptureEngine.g.cpp"
 
 #include "Media.Functions.h"
-#include "Media.Payload.h"
 #include "Media.Capture.MrcAudioEffect.h"
 #include "Media.Capture.MrcVideoEffect.h"
 
@@ -24,6 +23,7 @@ using namespace Windows::Media::Effects;
 using namespace Windows::Media::Core;
 using namespace Windows::Media::Capture;
 using namespace Windows::Media::MediaProperties;
+using namespace Windows::Perception::Spatial;
 
 _Use_decl_annotations_
 CameraCapture::Plugin::Module CaptureEngine::Create(
@@ -66,6 +66,7 @@ CaptureEngine::CaptureEngine()
     , m_photoTexture(nullptr)
     , m_photoTextureSRV(nullptr)
     , m_photoSample(nullptr)
+    , m_transform(nullptr)
 {
 }
 
@@ -238,7 +239,7 @@ hresult CaptureEngine::StopPreview()
     return S_OK;
 }
 
-hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc)
+hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc, SpatialCoordinateSystem const& coordinateSystem)
 {
     if (m_takePhotoOp)
     {
@@ -265,9 +266,11 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
 
     IFR(CreateDeviceResources());
 
-    m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc);
+    m_takePhotoOp = TakePhotoCoroutine(width, height, enableMrc, coordinateSystem);
     m_takePhotoOp.Completed([this, strong = get_strong()](auto const& result, auto const& status)
     {
+        auto payload = m_takePhotoOp.GetResults();
+
         m_takePhotoOp = nullptr;
 
         if (status == AsyncStatus::Error)
@@ -289,6 +292,11 @@ hresult CaptureEngine::TakePhoto(uint32_t width, uint32_t height, bool enableMrc
             state.value.captureState.width = m_photoTextureDesc.Width;
             state.value.captureState.height = m_photoTextureDesc.Height;
             state.value.captureState.texturePtr = m_photoTextureSRV.get();
+            if (payload != nullptr)
+            {
+                state.value.captureState.worldMatrix = payload.CameraToWorld();
+                state.value.captureState.projectionMatrix = payload.CameraProjection();
+            }
 
             Callback(state);
         }
@@ -711,12 +719,15 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
     co_await calling_thread;
 }
 
-IAsyncAction CaptureEngine::TakePhotoCoroutine(
+IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine(
     uint32_t const width,
     uint32_t const height,
-    boolean const enableMrc)
+    boolean const enableMrc,
+    SpatialCoordinateSystem const& coordinateSystem)
 {
     winrt::apartment_context calling_thread;
+
+    Media::Payload photoPayload = nullptr;
 
     co_await resume_background();
 
@@ -795,6 +806,19 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
         com_ptr<IMFSample> spSample = nullptr;
         IFT(spService->GetService(MF_WRAPPED_SAMPLE_SERVICE, __uuidof(IMFSample), spSample.put_void()));
 
+        // get the transform
+        if (coordinateSystem != nullptr)
+        {
+            Windows::Foundation::Numerics::float4x4 transform{};
+            Windows::Foundation::Numerics::float4x4 projection{};
+            if (SUCCEEDED(m_transform->GetTransforms(spSample, coordinateSystem, transform, projection)))
+            {
+                photoPayload = Media::Payload();
+                IFT(photoPayload.as<IStreamSample>()->Sample(MFMediaType_Video, mediaType, spSample));
+                photoPayload.as<IStreamSample>()->SetTransformAndProjection(transform, projection);
+            }
+        }
+
         // copy the data
         IFT(CopySample(MFMediaType_Video, spSample, m_photoSample));
     }
@@ -821,6 +845,8 @@ IAsyncAction CaptureEngine::TakePhotoCoroutine(
     SetEvent(m_takePhotoEventHandle.get());
 
     co_await calling_thread;
+
+    co_return photoPayload;
 }
 
 
@@ -1075,6 +1101,7 @@ hresult CaptureEngine::CreatePhotoTexture(uint32_t width, uint32_t height)
 
     IFR(mediaSample->AddBuffer(dxgiMediaBuffer.get()));
 
+    m_transform = Media::Transform().as<ITransformPriv>();
     m_photoTextureDesc = desc;
     m_photoTexture = photoTexture;
     m_photoTextureSRV = srv;

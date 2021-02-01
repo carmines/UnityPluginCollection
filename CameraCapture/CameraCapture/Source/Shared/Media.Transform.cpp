@@ -130,7 +130,9 @@ hresult Transform::Update(
 
 hresult Transform::UpdateV2(
     Media::Payload const& payload,
-    SpatialCoordinateSystem const& worldOrigin)
+    SpatialCoordinateSystem const& worldOrigin
+    
+)
 {
     const auto streamSample = payload.try_as<IStreamSample>();
     if (streamSample == nullptr || streamSample->Sample() == nullptr)
@@ -208,4 +210,50 @@ void Transform::Reset()
 {
     m_locator = nullptr;
     m_frameOfReference = nullptr;
+}
+
+hresult Transform::GetTransforms(
+    com_ptr<IMFSample> const& sourceSample,
+    Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem,
+    Windows::Foundation::Numerics::float4x4& transform,
+    Windows::Foundation::Numerics::float4x4& projection) try
+{
+    // camera view
+    UINT32 sizeCameraView = 0;
+    Numerics::float4x4 cameraView{};
+    IFR(sourceSample->GetBlob(MFSampleExtension_Spatial_CameraViewTransform, (UINT8*)&cameraView, sizeof(cameraView), &sizeCameraView));
+
+    // coordinate space
+    SpatialCoordinateSystem cameraCoordinateSystem = nullptr;
+    IFR(sourceSample->GetUnknown(MFSampleExtension_Spatial_CameraCoordinateSystem, winrt::guid_of<SpatialCoordinateSystem>(), winrt::put_abi(cameraCoordinateSystem)));
+
+    // sample projection matrix
+    UINT32 sizeCameraProject = 0;
+    Windows::Foundation::Numerics::float4x4 cameraProjection{};
+    IFR(sourceSample->GetBlob(MFSampleExtension_Spatial_CameraProjectionTransform, (UINT8*)&cameraProjection, sizeof(cameraProjection), &sizeCameraProject));
+
+    auto transformRef = cameraCoordinateSystem.TryGetTransformTo(appCoordinateSystem);
+    NULL_CHK_HR(transformRef, E_POINTER);
+
+    // transform matrix to convert to app world space
+    const auto& cameraToWorld = transformRef.Value();
+
+    // transform to world space
+    Numerics::float4x4 invertedCameraView{};
+    if (!Numerics::invert(cameraView, &invertedCameraView))
+    {
+        throw_hresult(E_UNEXPECTED);
+    }
+
+    // overwrite the cameraView with new value
+    invertedCameraView *= cameraToWorld;
+
+    transform = invertedCameraView;
+    projection = cameraProjection;
+
+    return S_OK;
+}
+catch(hresult_error const& er)
+{
+    return er.code();
 }

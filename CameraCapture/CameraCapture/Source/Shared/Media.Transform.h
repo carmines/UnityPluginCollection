@@ -4,17 +4,18 @@
 #include <winrt/windows.perception.spatial.h>
 #include <mfapi.h>
 
+struct __declspec(uuid("27ee71f8-e7d3-435c-b394-42058efa6591")) ITransformPriv : ::IUnknown
+{
+    virtual winrt::hresult GetTransforms(
+        _In_ winrt::com_ptr<IMFSample> const& sourceSample, 
+        _In_ winrt::Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem,
+        _Out_ winrt::Windows::Foundation::Numerics::float4x4& transform,
+        _Out_ winrt::Windows::Foundation::Numerics::float4x4& projection) = 0;
+};
 
-//struct __declspec(uuid("27ee71f8-e7d3-435c-b394-42058efa6591")) ITransformPriv : ::IUnknown
-//{
-//    virtual winrt::hresult __stdcall Update(
-//        _In_ winrt::com_ptr<IMFSample> const& sourceSample, 
-//        _In_ winrt::Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem) = 0;
-//};
-//
 namespace winrt::CameraCapture::Media::implementation
 {
-    struct Transform : TransformT<Transform>
+    struct Transform : TransformT<Transform, ITransformPriv>
     {
         Transform();
         ~Transform() { Reset(); }
@@ -23,6 +24,13 @@ namespace winrt::CameraCapture::Media::implementation
         bool ProcessWorldTransform(
             Media::Payload const& payload, 
             Windows::Perception::Spatial::SpatialCoordinateSystem const& worldOrigin);
+
+        // ITransformPriv
+        virtual hresult GetTransforms(
+            _In_ com_ptr<IMFSample> const& sourceSample,
+            _In_ Windows::Perception::Spatial::SpatialCoordinateSystem const& appCoordinateSystem,
+            _Out_ Windows::Foundation::Numerics::float4x4& transform,
+            _Out_ Windows::Foundation::Numerics::float4x4& projection) override;
 
     private:
         void Reset();

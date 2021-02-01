@@ -18,7 +18,7 @@ namespace CameraCapture.Plugin
 
         HRESULT StartPreview(UInt32 width, UInt32 height, Boolean enableAudio, Boolean enableMrc);
         HRESULT StopPreview();
-        HRESULT TakePhoto(UInt32 width, UInt32 height, Boolean enableMrc);
+        HRESULT TakePhoto(UInt32 width, UInt32 height, Boolean enableMrc, Windows.Perception.Spatial.SpatialCoordinateSystem coordinateSystem);
 
         CameraCapture.Media.PayloadHandler PayloadHandler{ get; set; };
         CameraCapture.Media.Capture.Sink MediaSink{ get; };

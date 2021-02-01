@@ -9,6 +9,7 @@
 #include "Media.SharedTexture.h"
 #include "Media.Capture.Sink.h"
 #include "Media.Transform.h"
+#include "Media.Payload.h"
 
 #include <mfapi.h>
 #include <winrt/windows.media.h>
@@ -30,7 +31,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         hresult StartPreview(uint32_t width, uint32_t height, bool enableAudio, bool enableMrc);
         hresult StopPreview();
-        hresult TakePhoto(uint32_t width, uint32_t height, bool enableMrc);
+        hresult TakePhoto(uint32_t width, uint32_t height, bool enableMrc, Windows::Perception::Spatial::SpatialCoordinateSystem const& coordinateSystem);
 
         CameraCapture::Media::Capture::Sink MediaSink();
 
@@ -44,7 +45,9 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
         Windows::Foundation::IAsyncAction StopPreviewCoroutine();
-        Windows::Foundation::IAsyncAction TakePhotoCoroutine(uint32_t const width, uint32_t const height, boolean const enableMrc);
+        Windows::Foundation::IAsyncOperation<CameraCapture::Media::Payload> TakePhotoCoroutine(
+            uint32_t const width, uint32_t const height, boolean const enableMrc, 
+            Windows::Perception::Spatial::SpatialCoordinateSystem const& coordinateSystem);
 
         Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(uint32_t const& width, uint32_t const& height, boolean const& enableAudio);
         Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
@@ -68,7 +71,7 @@ namespace winrt::CameraCapture::Plugin::implementation
 
         Windows::Foundation::IAsyncAction m_startPreviewOp;
         Windows::Foundation::IAsyncAction m_stopPreviewOp;
-        Windows::Foundation::IAsyncAction m_takePhotoOp;
+        Windows::Foundation::IAsyncOperation<Media::Payload> m_takePhotoOp;
 
         // media capture
         Windows::Media::Capture::MediaCategory m_category;
@@ -96,6 +99,7 @@ namespace winrt::CameraCapture::Plugin::implementation
         com_ptr<ID3D11Texture2D> m_photoTexture;
         com_ptr<ID3D11ShaderResourceView> m_photoTextureSRV;
         com_ptr<IMFSample> m_photoSample;
+        com_ptr<ITransformPriv> m_transform;
     };
 }
 
