@@ -345,6 +345,8 @@ namespace CameraCapture
         {
             photoCompletionSource?.TrySetCanceled();
 
+            spatialCoordinateSystemPtr = UnityEngine.XR.WSA.WorldManager.GetNativeISpatialCoordinateSystemPtr();
+
             Texture2D copyTexture = null;
 
             var hr = Native.TakePhoto(instanceId, (UInt32)width, (UInt32)height, useMrc, spatialCoordinateSystemPtr);
@@ -451,7 +453,7 @@ namespace CameraCapture
             internal static extern Int32 SetCoordinateSystem(Int32 instanceId, IntPtr spatialCoordinateSystemPtr);
 
             [DllImport(Wrapper.ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "CaptureTakePhoto")]
-            internal static extern Int32 TakePhoto(Int32 instanceId, UInt32 width, UInt32 height, [MarshalAs(UnmanagedType.I1)]Boolean enableMrc, IntPtr spatialCoordinateSystemPtr);
+            internal static extern Int32 TakePhoto(Int32 instanceId, UInt32 width, UInt32 height, [MarshalAs(UnmanagedType.Bool)]Boolean enableMrc, IntPtr spatialCoordinateSystemPtr);
         }
     }
 }
