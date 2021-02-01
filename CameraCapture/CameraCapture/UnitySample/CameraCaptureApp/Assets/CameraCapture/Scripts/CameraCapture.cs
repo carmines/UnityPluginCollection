@@ -347,7 +347,7 @@ namespace CameraCapture
 
             Texture2D copyTexture = null;
 
-            var hr = Native.TakePhoto(instanceId, (UInt32)width, (UInt32)height, useMrc);
+            var hr = Native.TakePhoto(instanceId, (UInt32)width, (UInt32)height, useMrc, spatialCoordinateSystemPtr);
             if (hr == 0)
             {
                 photoCompletionSource = new TaskCompletionSource<Wrapper.CaptureState>();
@@ -451,7 +451,7 @@ namespace CameraCapture
             internal static extern Int32 SetCoordinateSystem(Int32 instanceId, IntPtr spatialCoordinateSystemPtr);
 
             [DllImport(Wrapper.ModuleName, CallingConvention = CallingConvention.StdCall, EntryPoint = "CaptureTakePhoto")]
-            internal static extern Int32 TakePhoto(Int32 instanceId, UInt32 width, UInt32 height, [MarshalAs(UnmanagedType.I1)]Boolean enableMrc);
+            internal static extern Int32 TakePhoto(Int32 instanceId, UInt32 width, UInt32 height, [MarshalAs(UnmanagedType.I1)]Boolean enableMrc, IntPtr spatialCoordinateSystemPtr);
         }
     }
 }

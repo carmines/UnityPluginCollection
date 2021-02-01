@@ -720,10 +720,10 @@ IAsyncAction CaptureEngine::StopPreviewCoroutine()
 }
 
 IAsyncOperation<CameraCapture::Media::Payload> CaptureEngine::TakePhotoCoroutine(
-    uint32_t const width,
-    uint32_t const height,
-    boolean const enableMrc,
-    SpatialCoordinateSystem const& coordinateSystem)
+    uint32_t width,
+    uint32_t height,
+    boolean enableMrc,
+    SpatialCoordinateSystem coordinateSystem)
 {
     winrt::apartment_context calling_thread;
 

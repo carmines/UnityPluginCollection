@@ -46,8 +46,8 @@ namespace winrt::CameraCapture::Plugin::implementation
         Windows::Foundation::IAsyncAction StartPreviewCoroutine(uint32_t const width, uint32_t const height, boolean const enableAudio, boolean const enableMrc);
         Windows::Foundation::IAsyncAction StopPreviewCoroutine();
         Windows::Foundation::IAsyncOperation<CameraCapture::Media::Payload> TakePhotoCoroutine(
-            uint32_t const width, uint32_t const height, boolean const enableMrc, 
-            Windows::Perception::Spatial::SpatialCoordinateSystem const& coordinateSystem);
+            uint32_t width, uint32_t height, boolean enableMrc, 
+            Windows::Perception::Spatial::SpatialCoordinateSystem coordinateSystem);
 
         Windows::Foundation::IAsyncAction CreateMediaCaptureAsync(uint32_t const& width, uint32_t const& height, boolean const& enableAudio);
         Windows::Foundation::IAsyncAction ReleaseMediaCaptureAsync();
